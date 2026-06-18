@@ -1,5 +1,6 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
+import { DashboardPage } from './pages/DashboardPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
 
 export default function App() {
@@ -8,16 +9,7 @@ export default function App() {
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route
-            path="/dashboard"
-            element={
-              <PlaceholderPage
-                eyebrow="Overview"
-                title="Dashboard"
-                description="Your workflow capture command centre."
-              />
-            }
-          />
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route
             path="/sessions"
             element={

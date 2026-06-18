@@ -5,5 +5,6 @@ import { contextBridge, ipcRenderer } from 'electron'
 // Node/Electron APIs directly.
 contextBridge.exposeInMainWorld('api', {
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
-  getSurajLol: async() => "kuch na"
+  getSurajLol: async() => "kuch na",
+  getSomeOtherThing: () => "kuch AUR bhi na"
 })
