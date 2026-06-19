@@ -34,6 +34,10 @@ export function RecorderCard() {
     status === 'starting' ||
     status === 'stopping' ||
     status === 'processing'
+  const permissionError = error?.toLowerCase().includes('permission')
+  const permissionType = error?.toLowerCase().includes('screen recording')
+    ? 'screen'
+    : 'accessibility'
 
   const toggleRecording = useCallback(() => {
     if (isRecording || isPaused) {
@@ -151,7 +155,20 @@ export function RecorderCard() {
           </p>
         )}
 
-        {error && <p className="mt-5 text-xs text-red-400">{error}</p>}
+        {error && (
+          <div className="mt-5 flex flex-col items-center gap-3">
+            <p className="max-w-lg text-xs leading-5 text-red-400">{error}</p>
+            {permissionError && (
+              <button
+                type="button"
+                onClick={() => void window.api.recording.openPermissionSettings(permissionType)}
+                className="rounded-lg border border-white/15 bg-white/6 px-4 py-2 text-xs font-bold text-white transition hover:bg-white/12"
+              >
+                Open Privacy Settings
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="mt-12 flex flex-wrap items-center justify-center gap-4 font-mono text-xs font-semibold tracking-[0.08em] text-white/65 sm:text-sm">
           <span>⌘ Cmd + Shift + R</span>

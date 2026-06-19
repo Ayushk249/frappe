@@ -29,7 +29,12 @@ export function useRecording() {
     try {
       setState(await command())
     } catch (error) {
-      setCommandError(error instanceof Error ? error.message : 'Recording command failed.')
+      const message = error instanceof Error ? error.message : 'Recording command failed.'
+      setCommandError(
+        message
+          .replace(/^Error invoking remote method '[^']+': Error:\s*/i, '')
+          .replace(/^Error:\s*/i, '')
+      )
     }
   }, [])
 

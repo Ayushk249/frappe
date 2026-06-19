@@ -88,6 +88,7 @@ export interface RecordingApi {
   resume: () => Promise<RecordingState>
   stop: () => Promise<RecordingState>
   getState: () => Promise<RecordingState>
+  openPermissionSettings: (permission: 'accessibility' | 'screen') => Promise<void>
   onStateChanged: (listener: (state: RecordingState) => void) => () => void
 }
 
@@ -97,6 +98,7 @@ export const recordingIpc = {
   resume: 'recording:resume',
   stop: 'recording:stop',
   getState: 'recording:get-state',
+  openPermissionSettings: 'recording:open-permission-settings',
   stateChanged: 'recording:state-changed',
   frameSample: 'recording:frame-sample',
   captureReady: 'recording:capture-ready',

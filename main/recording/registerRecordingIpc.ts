@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow, ipcMain, shell } from 'electron'
 import {
   recordingIpc,
   type RecordingOptions,
@@ -22,6 +22,20 @@ export function registerRecordingIpc(manager: RecordingManager): () => void {
   ipcMain.handle(recordingIpc.resume, () => manager.resume())
   ipcMain.handle(recordingIpc.stop, () => manager.stop())
   ipcMain.handle(recordingIpc.getState, () => manager.getState())
+  ipcMain.handle(
+    recordingIpc.openPermissionSettings,
+    (_event, permission: 'accessibility' | 'screen') => {
+      if (process.platform !== 'darwin') {
+        return
+      }
+
+      const pane =
+        permission === 'accessibility' ? 'Privacy_Accessibility' : 'Privacy_ScreenCapture'
+      return shell.openExternal(
+        `x-apple.systempreferences:com.apple.preference.security?${pane}`
+      )
+    }
+  )
 
   return () => {
     manager.off('state-changed', broadcastState)
@@ -30,5 +44,6 @@ export function registerRecordingIpc(manager: RecordingManager): () => void {
     ipcMain.removeHandler(recordingIpc.resume)
     ipcMain.removeHandler(recordingIpc.stop)
     ipcMain.removeHandler(recordingIpc.getState)
+    ipcMain.removeHandler(recordingIpc.openPermissionSettings)
   }
 }

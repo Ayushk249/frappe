@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('api', {
     resume: () => ipcRenderer.invoke(recordingIpc.resume),
     stop: () => ipcRenderer.invoke(recordingIpc.stop),
     getState: () => ipcRenderer.invoke(recordingIpc.getState),
+    openPermissionSettings: (permission: 'accessibility' | 'screen') =>
+      ipcRenderer.invoke(recordingIpc.openPermissionSettings, permission),
     onStateChanged: (listener: (state: RecordingState) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, state: RecordingState) => listener(state)
       ipcRenderer.on(recordingIpc.stateChanged, handler)
