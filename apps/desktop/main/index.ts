@@ -1,5 +1,11 @@
 import { app, BrowserWindow, shell, ipcMain } from 'electron'
 import { join } from 'path'
+import {
+  ConnectionSettingsStore,
+  connectionSettingsPath
+} from './api/ConnectionSettingsStore'
+import { WorkTraceApiClient } from './api/WorkTraceApiClient'
+import { registerConnectionIpc } from './api/registerConnectionIpc'
 import { RecordingManager } from './recording/RecordingManager'
 import { RecordingControlsWindow } from './recording/RecordingControlsWindow'
 import { InputEventService } from './recording/InputEventService'
@@ -40,9 +46,17 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Example IPC handler — renderer calls window.api.getAppVersion()
   ipcMain.handle('get-app-version', () => app.getVersion())
+  const connectionSettings = new ConnectionSettingsStore(
+    connectionSettingsPath(app.getPath('userData'))
+  )
+  await connectionSettings.initialize()
+  const apiClient = new WorkTraceApiClient(connectionSettings)
+  registerConnectionIpc(connectionSettings, apiClient)
+  void apiClient.testConnection()
+
   const sessionWriter = new SessionWriter(join(app.getPath('userData'), 'recordings'))
   const screenCapture = new ScreenCaptureService(sessionWriter)
   recordingControlsWindow = new RecordingControlsWindow(process.env['ELECTRON_RENDERER_URL'])

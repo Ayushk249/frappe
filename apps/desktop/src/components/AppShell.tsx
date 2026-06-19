@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useConnection } from '../features/connection/useConnection'
 
 type IconName = 'dashboard' | 'sessions' | 'library' | 'analytics' | 'settings'
 
@@ -76,6 +77,23 @@ function NavIcon({ name }: { name: IconName }) {
 export function AppShell() {
   const location = useLocation()
   const pageTitle = routeTitles[location.pathname] ?? 'WorkTrace'
+  const { status: connection } = useConnection()
+  const connectionLabel =
+    connection.state === 'connected'
+      ? 'SYSTEM SYNCED'
+      : connection.state === 'checking'
+        ? 'CHECKING SYSTEM'
+        : connection.state === 'error'
+          ? 'SYSTEM OFFLINE'
+          : 'SETUP REQUIRED'
+  const connectionColor =
+    connection.state === 'connected'
+      ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.75)]'
+      : connection.state === 'checking'
+        ? 'animate-pulse bg-amber-400'
+        : connection.state === 'error'
+          ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.55)]'
+          : 'bg-white/30'
 
   return (
     <div className="min-h-screen bg-[#070707] text-white md:grid md:grid-cols-[240px_minmax(0,1fr)]">
@@ -128,8 +146,8 @@ export function AppShell() {
             <h1 className="text-base font-bold">{pageTitle}</h1>
             <span className="h-5 w-px bg-white/15" />
             <div className="flex items-center gap-2 font-mono text-[10px] font-semibold tracking-[0.1em] text-white/65">
-              <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.75)]" />
-              SYSTEM SYNCED
+              <span className={`size-1.5 rounded-full ${connectionColor}`} />
+              {connectionLabel}
             </div>
           </div>
 

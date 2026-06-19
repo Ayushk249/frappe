@@ -1,5 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import {
+  connectionIpc,
+  type ConnectionSettings,
+  type ConnectionStatus
+} from '../shared/connection'
+import {
   recordingIpc,
   type RecordingOptions,
   type RecordingState
@@ -12,6 +17,17 @@ contextBridge.exposeInMainWorld('api', {
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   getSurajLol: async() => "kuch na",
   getSomeOtherThing: () => "kuch AUR bhi na",
+  connection: {
+    getStatus: () => ipcRenderer.invoke(connectionIpc.getStatus),
+    save: (settings: ConnectionSettings) => ipcRenderer.invoke(connectionIpc.save, settings),
+    test: () => ipcRenderer.invoke(connectionIpc.test),
+    onStatusChanged: (listener: (status: ConnectionStatus) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, status: ConnectionStatus) =>
+        listener(status)
+      ipcRenderer.on(connectionIpc.statusChanged, handler)
+      return () => ipcRenderer.off(connectionIpc.statusChanged, handler)
+    }
+  },
   recording: {
     start: (options?: Partial<RecordingOptions>) => ipcRenderer.invoke(recordingIpc.start, options),
     pause: () => ipcRenderer.invoke(recordingIpc.pause),
