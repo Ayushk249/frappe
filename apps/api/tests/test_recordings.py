@@ -1,4 +1,6 @@
 import hashlib
+import json
+from uuid import uuid4
 
 from test_api import auth_headers
 
@@ -15,53 +17,134 @@ def create_recording(client, has_audio=True):
 
 
 def upload_chunk(
-    client, recording_id, index, payload=b"chunk", checksum=None, idempotency_key=None
+    client,
+    recording_id,
+    index,
+    payload=b"chunk",
+    checksum=None,
+    idempotency_key=None,
+    content_type=None,
+    metadata=None,
+    media_type="application/octet-stream",
 ):
     checksum = checksum or hashlib.sha256(payload).hexdigest()
     return client.put(
         f"/recordings/{recording_id}/chunks/{index}",
         headers=auth_headers(),
         data={
-            "content_type": "audio" if index == 0 else "events",
+            "content_type": content_type or ("audio" if index == 0 else "events"),
             "timestamp_start_ms": index * 10_000,
             "timestamp_end_ms": (index + 1) * 10_000,
             "checksum_sha256": checksum,
             "idempotency_key": idempotency_key or f"{recording_id}:{index}",
             "payload_size": len(payload),
+            "metadata_json": json.dumps(metadata or {}),
         },
-        files={"file": (f"chunk-{index}.bin", payload, "application/octet-stream")},
+        files={"file": (f"chunk-{index}.bin", payload, media_type)},
     )
 
 
 def test_resumable_chunk_upload_and_status_pipeline(client):
-    recording = create_recording(client)
-    first = upload_chunk(client, recording["id"], 0, b"audio")
-    second = upload_chunk(client, recording["id"], 1, b"events")
+    recording = create_recording(client, has_audio=False)
+    before_screenshot_id = str(uuid4())
+    after_screenshot_id = str(uuid4())
+    event_id = str(uuid4())
+    before_png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8 + b"\x00\x00\x05\x00\x00\x00\x02\xd0"
+    after_png = before_png + b"changed"
+    event_payload = json.dumps(
+        {
+            "id": event_id,
+            "sequence": 1,
+            "timestamp": "2026-06-19T10:00:00Z",
+            "type": "click",
+            "data": {
+                "x": 480,
+                "y": 320,
+                "button": "left",
+                "application": "ERP Desktop",
+                "targetLabel": "Approve invoice",
+            },
+            "beforeScreenshotId": before_screenshot_id,
+        }
+    ).encode()
+
+    first = upload_chunk(
+        client,
+        recording["id"],
+        0,
+        before_png,
+        content_type="screenshots",
+        metadata={
+            "id": before_screenshot_id,
+            "sequence": 1,
+            "capturedAt": "2026-06-19T09:59:59Z",
+            "changeScore": 0,
+        },
+        media_type="image/png",
+    )
+    second = upload_chunk(
+        client,
+        recording["id"],
+        1,
+        event_payload,
+        content_type="events",
+        media_type="application/x-ndjson",
+    )
+    third = upload_chunk(
+        client,
+        recording["id"],
+        2,
+        after_png,
+        content_type="screenshots",
+        metadata={
+            "id": after_screenshot_id,
+            "sequence": 2,
+            "capturedAt": "2026-06-19T10:00:01Z",
+            "eventIds": [event_id],
+            "changeScore": 0.24,
+        },
+        media_type="image/png",
+    )
     assert first.status_code == 200
     assert second.status_code == 200
+    assert third.status_code == 200
 
-    duplicate = upload_chunk(client, recording["id"], 0, b"audio")
+    duplicate = upload_chunk(
+        client,
+        recording["id"],
+        0,
+        before_png,
+        content_type="screenshots",
+        metadata={
+            "id": before_screenshot_id,
+            "sequence": 1,
+            "capturedAt": "2026-06-19T09:59:59Z",
+            "changeScore": 0,
+        },
+        media_type="image/png",
+    )
     assert duplicate.status_code == 200
     assert duplicate.json()["duplicate"] is True
 
     completed = client.post(
         f"/recordings/{recording['id']}/complete",
         headers=auth_headers(),
-        json={"expected_chunk_count": 2},
+        json={"expected_chunk_count": 3},
     )
     assert completed.status_code == 200
-    assert completed.json()["status"] == "validating"
-    late = upload_chunk(client, recording["id"], 2, b"late")
+    completed_recording = completed.json()
+    assert completed_recording["status"] == "ready_for_review"
+    assert completed_recording["session_id"]
+    late = upload_chunk(client, recording["id"], 3, b"late")
     assert late.status_code == 409
 
     current = client.get(f"/recordings/{recording['id']}/status", headers=auth_headers())
     assert current.status_code == 200
-    assert current.json()["recording"]["status"] == "validating"
+    assert current.json()["recording"]["status"] == "ready_for_review"
     assert current.json()["stages"] == [
         "recording",
         "uploading",
         "validating",
-        "transcribing_audio",
         "processing_screenshots",
         "aligning_evidence",
         "generating_sop",
@@ -69,7 +152,26 @@ def test_resumable_chunk_upload_and_status_pipeline(client):
         "completed",
     ]
     repeated = client.get(f"/recordings/{recording['id']}/status", headers=auth_headers())
-    assert repeated.json()["recording"]["status"] == "validating"
+    assert repeated.json()["recording"]["status"] == "ready_for_review"
+
+    session = client.get(
+        f"/sessions/{completed_recording['session_id']}", headers=auth_headers()
+    )
+    assert session.status_code == 200
+    event = session.json()["events"][0]
+    assert session.json()["source_type"] == "desktop"
+    assert session.json()["recording_id"] == recording["id"]
+    assert event["event_type"] == "click"
+    assert event["before_screenshot_id"] == before_screenshot_id
+    assert event["after_screenshot_id"] == after_screenshot_id
+
+    export = client.get(
+        f"/exports/{completed_recording['session_id']}", headers=auth_headers()
+    )
+    assert export.status_code == 200
+    assert len(export.json()["sops"]) == 1
+    assert export.json()["sops"][0]["status"] == "draft"
+    assert export.json()["sops"][0]["steps"][0]["screenshot_reference"] == after_screenshot_id
 
 
 def test_rejects_checksum_mismatch_and_missing_chunks(client):
@@ -85,6 +187,32 @@ def test_rejects_checksum_mismatch_and_missing_chunks(client):
     )
     assert completed.status_code == 409
     assert "missing chunks" in completed.json()["detail"]
+
+
+def test_failed_processing_is_visible_in_recording_status(client):
+    recording = create_recording(client, has_audio=False)
+    invalid_events = upload_chunk(
+        client,
+        recording["id"],
+        0,
+        b"not-json",
+        content_type="events",
+    )
+    assert invalid_events.status_code == 200
+
+    completed = client.post(
+        f"/recordings/{recording['id']}/complete",
+        headers=auth_headers(),
+        json={"expected_chunk_count": 1},
+    )
+
+    assert completed.status_code == 409
+    current = client.get(f"/recordings/{recording['id']}/status", headers=auth_headers())
+    assert current.status_code == 200
+    assert current.json()["recording"]["status"] == "failed"
+    assert current.json()["recording"]["error_message"] == (
+        "Recording contains no valid screenshots"
+    )
 
 
 def test_rejects_invalid_index_and_declared_size(client):

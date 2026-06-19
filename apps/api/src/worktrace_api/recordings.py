@@ -47,3 +47,10 @@ class ChunkStorage:
             if file.is_file():
                 file.unlink()
         directory.rmdir()
+
+    def read(self, storage_key: str) -> bytes:
+        path = (self.root / storage_key).resolve()
+        root = self.root.resolve()
+        if root not in path.parents:
+            raise ValueError("Chunk storage key escapes the recording root")
+        return path.read_bytes()

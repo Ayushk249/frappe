@@ -52,8 +52,9 @@ OIDC/JWT verification before any shared or production deployment.
 - Recording chunks use tenant-scoped local object storage. Replace the storage
   adapter with MinIO/S3 and enqueue workers after completion for multi-instance
   deployment.
-- Status polling reports worker-owned state; GET requests never advance the
-  pipeline. The processing workers themselves are a later milestone.
+- Completing a recording runs the local processing service synchronously;
+  status GET requests are read-only. Move that service behind a durable worker
+  queue before multi-instance deployment.
 - The local deterministic SOP generator is an adapter placeholder for approved
   external-AI calls.
 - Slow work currently runs synchronously; its service boundary is ready to move

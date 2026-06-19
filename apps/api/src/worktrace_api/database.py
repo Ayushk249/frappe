@@ -137,6 +137,7 @@ class RecordingChunkRecord(TenantRecord, Base):
     idempotency_key: Mapped[str] = mapped_column(String(200))
     payload_size: Mapped[int] = mapped_column(Integer)
     storage_key: Mapped[str] = mapped_column(String(500))
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

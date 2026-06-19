@@ -10,6 +10,7 @@ from worktrace_api.database import (
     FeedbackRecord,
     RecordingChunkRecord,
     RecordingRecord,
+    ScreenshotRecord,
     SessionLocal,
     SOPRecord,
     WorkflowSessionRecord,
@@ -22,6 +23,7 @@ from worktrace_api.schemas import (
     Feedback,
     Recording,
     RecordingStatus,
+    Screenshot,
     WorkflowSession,
 )
 
@@ -135,6 +137,7 @@ class Repository:
         idempotency_key: str,
         payload_size: int,
         storage_key: str,
+        metadata_json: dict | None = None,
     ) -> ChunkReceipt:
         existing = self.db.scalar(
             tenant_query(RecordingChunkRecord, self.tenant_id).where(
@@ -179,6 +182,7 @@ class Repository:
                 idempotency_key=idempotency_key,
                 payload_size=payload_size,
                 storage_key=storage_key,
+                metadata_json=metadata_json or {},
             )
         )
         recording.status = RecordingStatus.UPLOADING
@@ -201,6 +205,7 @@ class Repository:
         timestamp_end_ms: int,
         checksum_sha256: str,
         idempotency_key: str,
+        metadata_json: dict | None = None,
     ) -> ChunkReceipt | None:
         record = self.db.scalar(
             tenant_query(RecordingChunkRecord, self.tenant_id).where(
@@ -216,6 +221,7 @@ class Repository:
             or record.timestamp_end_ms != timestamp_end_ms
             or record.checksum_sha256 != checksum_sha256
             or record.idempotency_key != idempotency_key
+            or record.metadata_json != (metadata_json or {})
         ):
             raise ValueError("Chunk index already exists with different content or metadata")
         return ChunkReceipt(
@@ -249,6 +255,55 @@ class Repository:
         record.expected_chunk_count = expected_chunk_count
         record.status = RecordingStatus.VALIDATING
         record.completed_at = datetime.now(UTC)
+        self.db.commit()
+        return self._recording_from_record(record)
+
+    def list_recording_chunks(self, recording_id: UUID) -> list[RecordingChunkRecord]:
+        return list(
+            self.db.scalars(
+                tenant_query(RecordingChunkRecord, self.tenant_id)
+                .where(RecordingChunkRecord.recording_id == str(recording_id))
+                .order_by(RecordingChunkRecord.chunk_index)
+            ).all()
+        )
+
+    def save_screenshots(self, screenshots: list[Screenshot]) -> list[Screenshot]:
+        for screenshot in screenshots:
+            self._require_tenant(screenshot.tenant_id)
+            self.db.add(
+                ScreenshotRecord(
+                    id=str(screenshot.id),
+                    tenant_id=str(screenshot.tenant_id),
+                    recording_id=str(screenshot.recording_id),
+                    session_id=str(screenshot.session_id) if screenshot.session_id else None,
+                    sequence=screenshot.sequence,
+                    captured_at=screenshot.captured_at,
+                    storage_key=screenshot.storage_key,
+                    media_type=screenshot.media_type,
+                    width=screenshot.width,
+                    height=screenshot.height,
+                    change_score=screenshot.change_score,
+                    content_hash=screenshot.content_hash,
+                    redaction_status=screenshot.redaction_status,
+                    created_at=screenshot.created_at,
+                )
+            )
+        self.db.commit()
+        return screenshots
+
+    def link_recording_session(
+        self, recording_id: UUID, session_id: UUID, status: RecordingStatus
+    ) -> Recording:
+        record = self.db.scalar(
+            tenant_query(RecordingRecord, self.tenant_id).where(
+                RecordingRecord.id == str(recording_id)
+            )
+        )
+        if not record:
+            raise LookupError("Recording not found")
+        record.session_id = str(session_id)
+        record.status = status
+        record.error_message = None
         self.db.commit()
         return self._recording_from_record(record)
 

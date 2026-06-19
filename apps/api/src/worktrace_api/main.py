@@ -1,3 +1,4 @@
+import json
 from collections.abc import Generator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -22,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from worktrace_api.database import create_tables
 from worktrace_api.privacy import sanitize_session
+from worktrace_api.processing import RecordingProcessor
 from worktrace_api.recordings import ChunkStorage
 from worktrace_api.repository import Repository, get_db
 from worktrace_api.schemas import (
@@ -87,6 +89,7 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-Tenant-ID"],
 )
 chunk_storage = ChunkStorage(settings.recording_storage_path, settings.max_chunk_bytes)
+recording_processor = RecordingProcessor(chunk_storage, settings.allowed_domains)
 processing_stages = [
     RecordingStatus.RECORDING,
     RecordingStatus.UPLOADING,
@@ -154,6 +157,7 @@ async def upload_recording_chunk(
     checksum_sha256: str = Form(pattern=r"^[a-f0-9]{64}$"),
     idempotency_key: str = Form(min_length=1, max_length=200),
     payload_size: int = Form(gt=0),
+    metadata_json: str = Form(default="{}"),
     file: UploadFile = File(),
     repo: Repository = Depends(repository),
 ) -> ChunkReceipt:
@@ -167,6 +171,9 @@ async def upload_recording_chunk(
         )
     payload = await file.read(settings.max_chunk_bytes + 1)
     try:
+        parsed_metadata = json.loads(metadata_json)
+        if not isinstance(parsed_metadata, dict):
+            raise ValueError("Chunk metadata must be a JSON object")
         actual_payload_size = chunk_storage.validate(payload, checksum_sha256)
         if actual_payload_size != payload_size:
             raise ValueError("Declared payload size does not match payload")
@@ -178,6 +185,7 @@ async def upload_recording_chunk(
             timestamp_end_ms,
             checksum_sha256,
             idempotency_key,
+            parsed_metadata,
         )
         if existing:
             return existing
@@ -208,6 +216,7 @@ async def upload_recording_chunk(
             idempotency_key=idempotency_key,
             payload_size=payload_size,
             storage_key=storage_key,
+            metadata_json=parsed_metadata,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
@@ -224,7 +233,8 @@ def complete_recording(
     repo: Repository = Depends(repository),
 ) -> Recording:
     try:
-        return repo.complete_recording(recording_id, payload.expected_chunk_count)
+        repo.complete_recording(recording_id, payload.expected_chunk_count)
+        return recording_processor.process(recording_id, repo)
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ValueError as exc:

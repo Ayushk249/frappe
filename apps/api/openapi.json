@@ -1338,6 +1338,11 @@
             "exclusiveMinimum": 0.0,
             "title": "Payload Size"
           },
+          "metadata_json": {
+            "type": "string",
+            "title": "Metadata Json",
+            "default": "{}"
+          },
           "file": {
             "type": "string",
             "contentMediaType": "application/octet-stream",
