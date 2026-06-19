@@ -50,8 +50,13 @@ export class ScreenCaptureService {
     this.currentScreenshotId = undefined
     this.pendingEventIds = []
 
-    await this.captureAndSave(1)
-    await this.sample()
+    try {
+      await this.captureAndSave(1)
+      await this.sample()
+    } catch (error) {
+      this.resetRuntimeState()
+      throw error
+    }
   }
 
   pause(): void {
@@ -81,7 +86,7 @@ export class ScreenCaptureService {
       await this.captureAndSave(this.highestChangeScore)
     }
 
-    this.resetPendingChange()
+    this.resetRuntimeState()
   }
 
   getCurrentScreenshotId(): string | undefined {
@@ -153,7 +158,7 @@ export class ScreenCaptureService {
       const captureError =
         error instanceof Error ? error : new Error('Screen capture failed unexpectedly.')
       this.callbacks?.onError(captureError)
-      this.active = false
+      this.resetRuntimeState()
     } finally {
       this.captureInProgress = false
       this.scheduleNextSample()
@@ -195,22 +200,47 @@ export class ScreenCaptureService {
     height: number
   }): Promise<DesktopCapturerSource> {
     const display = this.getTargetDisplay()
-    const sources = await desktopCapturer.getSources({
-      types: ['screen'],
-      thumbnailSize,
-      fetchWindowIcons: false
-    })
+    const sources = await this.getScreenSources(thumbnailSize)
     const displayId = display.id.toString()
     const source =
       sources.find((candidate) => candidate.display_id === displayId) ??
       sources.find((candidate) => candidate.name === `Screen ${displayId}`) ??
       sources[0]
 
-    if (!source || source.thumbnail.isEmpty()) {
-      throw new Error('No display source is available for screen capture.')
+    if (!source) {
+      throw new Error(getUnavailableDisplayMessage('macOS returned no display sources.'))
+    }
+
+    if (source.thumbnail.isEmpty()) {
+      const fallbackSources = await this.getScreenSources({
+        width: Math.min(thumbnailSize.width, 1920),
+        height: Math.min(thumbnailSize.height, 1080)
+      })
+      const fallback =
+        fallbackSources.find((candidate) => candidate.display_id === displayId) ??
+        fallbackSources[0]
+
+      if (!fallback || fallback.thumbnail.isEmpty()) {
+        throw new Error(
+          getUnavailableDisplayMessage('macOS returned an empty display image.')
+        )
+      }
+
+      return fallback
     }
 
     return source
+  }
+
+  private getScreenSources(thumbnailSize: {
+    width: number
+    height: number
+  }): Promise<DesktopCapturerSource[]> {
+    return desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize,
+      fetchWindowIcons: false
+    })
   }
 
   private getTargetDisplay() {
@@ -249,6 +279,27 @@ export class ScreenCaptureService {
     this.lastChangedAt = 0
     this.highestChangeScore = 0
   }
+
+  private resetRuntimeState(): void {
+    this.active = false
+    this.paused = false
+    this.captureInProgress = false
+    this.clearTimer()
+    this.previousThumbnail = null
+    this.currentScreenshotId = undefined
+    this.pendingEventIds = []
+    this.options = null
+    this.callbacks = null
+    this.resetPendingChange()
+  }
+}
+
+function getUnavailableDisplayMessage(detail: string): string {
+  if (process.platform === 'darwin') {
+    return `Screen capture could not start. ${detail} Fully quit and reopen WorkTrace after enabling Screen & System Audio Recording.`
+  }
+
+  return `Screen capture could not start. ${detail}`
 }
 
 function calculateChangeScore(
