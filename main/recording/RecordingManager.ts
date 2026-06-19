@@ -8,6 +8,7 @@ import {
 } from '../../shared/recording'
 import { SessionWriter } from './SessionWriter'
 import { ScreenCaptureService } from './ScreenCaptureService'
+import { InputEventService } from './InputEventService'
 
 const idleState: RecordingState = {
   status: 'idle',
@@ -36,7 +37,9 @@ export class RecordingManager extends EventEmitter {
 
   constructor(
     private readonly sessionWriter: SessionWriter,
-    private readonly screenCapture: ScreenCaptureService
+    private readonly screenCapture: ScreenCaptureService,
+    private readonly inputEvents: InputEventService,
+    private readonly shouldIgnoreInputPoint: (x: number, y: number) => boolean
   ) {
     super()
   }
@@ -50,8 +53,20 @@ export class RecordingManager extends EventEmitter {
   }
 
   async start(options: Partial<RecordingOptions> = {}): Promise<RecordingState> {
-    if (this.state.status !== 'idle' && this.state.status !== 'completed') {
+    if (
+      this.state.status !== 'idle' &&
+      this.state.status !== 'completed' &&
+      this.state.status !== 'error'
+    ) {
       throw new Error(`Cannot start a recording while status is ${this.state.status}`)
+    }
+
+    this.updateState({ ...idleState, status: 'requesting-permissions' })
+    if (!this.inputEvents.requestPermission()) {
+      const message =
+        'Accessibility permission is required. Enable WorkTrace in System Settings > Privacy & Security > Accessibility, then try again.'
+      this.updateState({ status: 'error', error: message })
+      throw new Error(message)
     }
 
     this.options = { ...defaultRecordingOptions, ...options }
@@ -99,6 +114,29 @@ export class RecordingManager extends EventEmitter {
       throw error
     }
 
+    try {
+      this.inputEvents.start({
+        getBeforeScreenshotId: () => this.screenCapture.getCurrentScreenshotId(),
+        shouldIgnorePoint: this.shouldIgnoreInputPoint,
+        onEventCaptured: (event) => {
+          this.screenCapture.registerEvent(event.id)
+        },
+        onEventSaved: () => {
+          this.updateState({ eventCount: this.state.eventCount + 1 })
+        },
+        onError: (error) => {
+          this.updateState({ status: 'error', error: error.message })
+          void this.sessionWriter.setStatus('error')
+        }
+      })
+    } catch (error) {
+      await this.screenCapture.stop()
+      const message = error instanceof Error ? error.message : 'Input capture could not start.'
+      this.updateState({ status: 'error', error: message })
+      await this.sessionWriter.setStatus('error')
+      throw error
+    }
+
     this.updateState({ status: 'recording' })
     return this.getState()
   }
@@ -109,6 +147,7 @@ export class RecordingManager extends EventEmitter {
       status: 'paused',
       pausedAt: new Date().toISOString()
     })
+    await this.inputEvents.pause()
     this.screenCapture.pause()
     await this.sessionWriter.setStatus('paused')
     return this.getState()
@@ -126,6 +165,7 @@ export class RecordingManager extends EventEmitter {
       pausedAt: null,
       accumulatedPausedMs: this.state.accumulatedPausedMs + pausedDuration
     })
+    this.inputEvents.resume()
     this.screenCapture.resume()
     await this.sessionWriter.setStatus('recording')
     return this.getState()
@@ -147,6 +187,7 @@ export class RecordingManager extends EventEmitter {
       accumulatedPausedMs
     })
 
+    await this.inputEvents.stop()
     await this.screenCapture.stop()
     this.updateState({ status: 'processing' })
     await this.sessionWriter.setStatus('completed')

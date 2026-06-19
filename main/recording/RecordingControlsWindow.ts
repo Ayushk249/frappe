@@ -43,6 +43,20 @@ export class RecordingControlsWindow {
     this.window = null
   }
 
+  containsPoint(x: number, y: number): boolean {
+    if (!this.window || this.window.isDestroyed() || !this.window.isVisible()) {
+      return false
+    }
+
+    const bounds = this.window.getBounds()
+    return (
+      x >= bounds.x &&
+      x <= bounds.x + bounds.width &&
+      y >= bounds.y &&
+      y <= bounds.y + bounds.height
+    )
+  }
+
   private createWindow(): BrowserWindow {
     const window = new BrowserWindow({
       width: WINDOW_WIDTH,

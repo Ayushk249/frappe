@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell, ipcMain } from 'electron'
 import { join } from 'path'
 import { RecordingManager } from './recording/RecordingManager'
 import { RecordingControlsWindow } from './recording/RecordingControlsWindow'
+import { InputEventService } from './recording/InputEventService'
 import { ScreenCaptureService } from './recording/ScreenCaptureService'
 import { SessionWriter } from './recording/SessionWriter'
 import { registerRecordingIpc } from './recording/registerRecordingIpc'
@@ -44,9 +45,15 @@ app.whenReady().then(() => {
   ipcMain.handle('get-app-version', () => app.getVersion())
   const sessionWriter = new SessionWriter(join(app.getPath('userData'), 'recordings'))
   const screenCapture = new ScreenCaptureService(sessionWriter)
-  recordingManager = new RecordingManager(sessionWriter, screenCapture)
-  registerRecordingIpc(recordingManager)
   recordingControlsWindow = new RecordingControlsWindow(process.env['ELECTRON_RENDERER_URL'])
+  const inputEvents = new InputEventService(sessionWriter)
+  recordingManager = new RecordingManager(
+    sessionWriter,
+    screenCapture,
+    inputEvents,
+    (x, y) => recordingControlsWindow?.containsPoint(x, y) ?? false
+  )
+  registerRecordingIpc(recordingManager)
   recordingManager.on('state-changed', (state) => recordingControlsWindow?.handleState(state))
 
   createWindow()

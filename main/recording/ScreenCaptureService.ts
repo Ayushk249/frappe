@@ -21,6 +21,8 @@ export class ScreenCaptureService {
   private screenshotSequence = 0
   private options: RecordingOptions | null = null
   private callbacks: ScreenCaptureCallbacks | null = null
+  private currentScreenshotId: string | undefined
+  private pendingEventIds: string[] = []
 
   constructor(private readonly sessionWriter: SessionWriter) {}
 
@@ -45,6 +47,8 @@ export class ScreenCaptureService {
     this.previousThumbnail = null
     this.pendingChange = false
     this.screenshotSequence = 0
+    this.currentScreenshotId = undefined
+    this.pendingEventIds = []
 
     await this.captureAndSave(1)
     await this.sample()
@@ -78,6 +82,16 @@ export class ScreenCaptureService {
     }
 
     this.resetPendingChange()
+  }
+
+  getCurrentScreenshotId(): string | undefined {
+    return this.currentScreenshotId
+  }
+
+  registerEvent(eventId: string): void {
+    if (!this.pendingEventIds.includes(eventId)) {
+      this.pendingEventIds.push(eventId)
+    }
   }
 
   private async sample(): Promise<void> {
@@ -162,7 +176,7 @@ export class ScreenCaptureService {
       id,
       sequence,
       capturedAt: new Date().toISOString(),
-      eventIds: [],
+      eventIds: [...this.pendingEventIds],
       filename: `${sequence.toString().padStart(5, '0')}-${id}.png`,
       width: source.thumbnail.getSize().width,
       height: source.thumbnail.getSize().height,
@@ -171,6 +185,8 @@ export class ScreenCaptureService {
     }
 
     await this.sessionWriter.appendScreenshot(record, png)
+    this.currentScreenshotId = record.id
+    this.pendingEventIds = []
     this.callbacks?.onScreenshotSaved(record)
   }
 
