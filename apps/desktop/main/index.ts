@@ -55,7 +55,7 @@ app.whenReady().then(async () => {
   await connectionSettings.initialize()
   const apiClient = new WorkTraceApiClient(connectionSettings)
   registerConnectionIpc(connectionSettings, apiClient)
-  void apiClient.testConnection()
+  await apiClient.testConnection()
 
   const sessionWriter = new SessionWriter(join(app.getPath('userData'), 'recordings'))
   const screenCapture = new ScreenCaptureService(sessionWriter)

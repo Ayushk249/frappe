@@ -1,29 +1,45 @@
-export type ConnectionState = 'not-configured' | 'checking' | 'connected' | 'error'
+export type ConnectionState = 'signed-out' | 'checking' | 'connected' | 'error'
 
-export interface ConnectionSettings {
-  apiUrl: string
+export interface Account {
+  userId: string
   tenantId: string
-  apiToken?: string
+  companyName: string
+  email: string
+  role: 'owner' | 'admin' | 'member'
+}
+
+export interface LoginCredentials {
+  apiUrl: string
+  email: string
+  password: string
+}
+
+export interface SignUpCredentials extends LoginCredentials {
+  companyName: string
 }
 
 export interface ConnectionStatus {
   state: ConnectionState
   apiUrl: string
-  tenantId: string
-  hasApiToken: boolean
+  account: Account | null
+  hasSession: boolean
   error: string | null
 }
 
 export interface ConnectionApi {
   getStatus: () => Promise<ConnectionStatus>
-  save: (settings: ConnectionSettings) => Promise<ConnectionStatus>
+  login: (credentials: LoginCredentials) => Promise<ConnectionStatus>
+  signup: (credentials: SignUpCredentials) => Promise<ConnectionStatus>
+  logout: () => Promise<ConnectionStatus>
   test: () => Promise<ConnectionStatus>
   onStatusChanged: (listener: (status: ConnectionStatus) => void) => () => void
 }
 
 export const connectionIpc = {
   getStatus: 'connection:get-status',
-  save: 'connection:save',
+  login: 'connection:login',
+  signup: 'connection:signup',
+  logout: 'connection:logout',
   test: 'connection:test',
   statusChanged: 'connection:status-changed'
 } as const

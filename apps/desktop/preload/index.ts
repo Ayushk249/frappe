@@ -1,8 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import {
   connectionIpc,
-  type ConnectionSettings,
-  type ConnectionStatus
+  type ConnectionStatus,
+  type LoginCredentials,
+  type SignUpCredentials
 } from '../shared/connection'
 import {
   recordingIpc,
@@ -19,7 +20,11 @@ contextBridge.exposeInMainWorld('api', {
   getSomeOtherThing: () => "kuch AUR bhi na",
   connection: {
     getStatus: () => ipcRenderer.invoke(connectionIpc.getStatus),
-    save: (settings: ConnectionSettings) => ipcRenderer.invoke(connectionIpc.save, settings),
+    login: (credentials: LoginCredentials) =>
+      ipcRenderer.invoke(connectionIpc.login, credentials),
+    signup: (credentials: SignUpCredentials) =>
+      ipcRenderer.invoke(connectionIpc.signup, credentials),
+    logout: () => ipcRenderer.invoke(connectionIpc.logout),
     test: () => ipcRenderer.invoke(connectionIpc.test),
     onStatusChanged: (listener: (status: ConnectionStatus) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, status: ConnectionStatus) =>

@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { ConnectionSettings, ConnectionStatus } from '../../../shared/connection'
+import type {
+  ConnectionStatus,
+  LoginCredentials,
+  SignUpCredentials
+} from '../../../shared/connection'
 
 const initialStatus: ConnectionStatus = {
-  state: 'not-configured',
+  state: 'checking',
   apiUrl: 'http://127.0.0.1:8000',
-  tenantId: '',
-  hasApiToken: false,
+  account: null,
+  hasSession: false,
   error: null
 }
 
@@ -17,8 +21,20 @@ export function useConnection() {
     return window.api.connection.onStatusChanged(setStatus)
   }, [])
 
-  const save = useCallback(async (settings: ConnectionSettings) => {
-    const nextStatus = await window.api.connection.save(settings)
+  const login = useCallback(async (credentials: LoginCredentials) => {
+    const nextStatus = await window.api.connection.login(credentials)
+    setStatus(nextStatus)
+    return nextStatus
+  }, [])
+
+  const signup = useCallback(async (credentials: SignUpCredentials) => {
+    const nextStatus = await window.api.connection.signup(credentials)
+    setStatus(nextStatus)
+    return nextStatus
+  }, [])
+
+  const logout = useCallback(async () => {
+    const nextStatus = await window.api.connection.logout()
     setStatus(nextStatus)
     return nextStatus
   }, [])
@@ -29,5 +45,5 @@ export function useConnection() {
     return nextStatus
   }, [])
 
-  return { status, save, test }
+  return { status, login, signup, logout, test }
 }

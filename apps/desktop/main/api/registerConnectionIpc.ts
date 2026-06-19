@@ -1,8 +1,9 @@
 import { BrowserWindow, ipcMain } from 'electron'
 import {
   connectionIpc,
-  type ConnectionSettings,
-  type ConnectionStatus
+  type ConnectionStatus,
+  type LoginCredentials,
+  type SignUpCredentials
 } from '../../shared/connection'
 import { ConnectionSettingsStore } from './ConnectionSettingsStore'
 import { WorkTraceApiClient } from './WorkTraceApiClient'
@@ -19,9 +20,12 @@ export function registerConnectionIpc(
   }
 
   ipcMain.handle(connectionIpc.getStatus, () => settings.getStatus())
-  ipcMain.handle(connectionIpc.save, async (_event, payload: ConnectionSettings) => {
-    await settings.save(payload)
-    return broadcast(await apiClient.testConnection())
-  })
+  ipcMain.handle(connectionIpc.signup, async (_event, payload: SignUpCredentials) =>
+    broadcast(await apiClient.signup(payload))
+  )
+  ipcMain.handle(connectionIpc.login, async (_event, payload: LoginCredentials) =>
+    broadcast(await apiClient.login(payload))
+  )
+  ipcMain.handle(connectionIpc.logout, async () => broadcast(await apiClient.logout()))
   ipcMain.handle(connectionIpc.test, async () => broadcast(await apiClient.testConnection()))
 }
