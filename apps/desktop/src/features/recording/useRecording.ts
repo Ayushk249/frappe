@@ -10,6 +10,7 @@ const initialState: RecordingState = {
   accumulatedPausedMs: 0,
   eventCount: 0,
   screenshotCount: 0,
+  audioChunkCount: 0,
   outputPath: null,
   remoteRecordingId: null,
   remoteSessionId: null,

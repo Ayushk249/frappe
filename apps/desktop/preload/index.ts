@@ -7,6 +7,7 @@ import {
 } from '../shared/connection'
 import {
   recordingIpc,
+  type AudioRecorderApi,
   type RecordingOptions,
   type RecordingState
 } from '../shared/recording'
@@ -39,7 +40,7 @@ contextBridge.exposeInMainWorld('api', {
     resume: () => ipcRenderer.invoke(recordingIpc.resume),
     stop: () => ipcRenderer.invoke(recordingIpc.stop),
     getState: () => ipcRenderer.invoke(recordingIpc.getState),
-    openPermissionSettings: (permission: 'accessibility' | 'screen') =>
+    openPermissionSettings: (permission: 'accessibility' | 'screen' | 'microphone') =>
       ipcRenderer.invoke(recordingIpc.openPermissionSettings, permission),
     onStateChanged: (listener: (state: RecordingState) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, state: RecordingState) => listener(state)
@@ -48,3 +49,37 @@ contextBridge.exposeInMainWorld('api', {
     }
   }
 })
+
+const audioRecorderApi = {
+  ready: () => ipcRenderer.send(recordingIpc.audioReady),
+  chunk: (chunk: {
+    capturedAt: string
+    mimeType: string
+    data: ArrayBuffer
+  }) => ipcRenderer.invoke(recordingIpc.audioChunk, chunk),
+  error: (message: string) => ipcRenderer.send(recordingIpc.audioError, message),
+  stopped: () => ipcRenderer.send(recordingIpc.audioStopped),
+  onStart: (listener: (options: { timesliceMs: number }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, options: { timesliceMs: number }) =>
+      listener(options)
+    ipcRenderer.on(recordingIpc.audioStart, handler)
+    return () => ipcRenderer.off(recordingIpc.audioStart, handler)
+  },
+  onPause: (listener: () => void) => {
+    const handler = () => listener()
+    ipcRenderer.on(recordingIpc.audioPause, handler)
+    return () => ipcRenderer.off(recordingIpc.audioPause, handler)
+  },
+  onResume: (listener: () => void) => {
+    const handler = () => listener()
+    ipcRenderer.on(recordingIpc.audioResume, handler)
+    return () => ipcRenderer.off(recordingIpc.audioResume, handler)
+  },
+  onStop: (listener: () => void) => {
+    const handler = () => listener()
+    ipcRenderer.on(recordingIpc.audioStop, handler)
+    return () => ipcRenderer.off(recordingIpc.audioStop, handler)
+  }
+} satisfies AudioRecorderApi
+
+contextBridge.exposeInMainWorld('audioRecorder', audioRecorderApi)

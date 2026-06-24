@@ -3,11 +3,16 @@ import { AppShell } from './components/AppShell'
 import { useConnection } from './features/connection/useConnection'
 import { DashboardPage } from './pages/DashboardPage'
 import { AuthPage } from './pages/AuthPage'
+import { AudioRecorderPage } from './pages/AudioRecorderPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
 import { RecordingControlsPage } from './pages/RecordingControlsPage'
 import { SettingsPage } from './pages/SettingsPage'
 
 export default function App() {
+  if (window.location.hash.startsWith('#/audio-recorder')) {
+    return <AudioRecorderPage />
+  }
+
   const { status } = useConnection()
 
   if (status.state === 'checking') {

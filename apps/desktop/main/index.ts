@@ -12,10 +12,12 @@ import { InputEventService } from './recording/InputEventService'
 import { ScreenCaptureService } from './recording/ScreenCaptureService'
 import { SessionWriter } from './recording/SessionWriter'
 import { RecordingUploader } from './recording/RecordingUploader'
+import { AudioCaptureService } from './recording/AudioCaptureService'
 import { registerRecordingIpc } from './recording/registerRecordingIpc'
 
 let recordingManager: RecordingManager | null = null
 let recordingControlsWindow: RecordingControlsWindow | null = null
+let audioCapture: AudioCaptureService | null = null
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -62,11 +64,13 @@ app.whenReady().then(async () => {
   const screenCapture = new ScreenCaptureService(sessionWriter)
   recordingControlsWindow = new RecordingControlsWindow(process.env['ELECTRON_RENDERER_URL'])
   const inputEvents = new InputEventService(sessionWriter)
+  audioCapture = new AudioCaptureService(sessionWriter, process.env['ELECTRON_RENDERER_URL'])
   const recordingUploader = new RecordingUploader(apiClient)
   recordingManager = new RecordingManager(
     sessionWriter,
     screenCapture,
     inputEvents,
+    audioCapture,
     recordingUploader,
     (x, y) => recordingControlsWindow?.containsPoint(x, y) ?? false
   )
@@ -90,4 +94,5 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   recordingControlsWindow?.destroy()
+  audioCapture?.destroy()
 })

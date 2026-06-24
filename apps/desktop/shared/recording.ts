@@ -63,6 +63,8 @@ export interface RecordingOptions {
   name?: string
   captureMode: CaptureMode
   displayId?: string
+  recordAudio: boolean
+  audioTimesliceMs: number
   sampleIntervalMs: number
   settleDurationMs: number
   maxSettleDurationMs: number
@@ -73,6 +75,8 @@ export interface RecordingOptions {
 
 export const defaultRecordingOptions: RecordingOptions = {
   captureMode: 'full-desktop',
+  recordAudio: true,
+  audioTimesliceMs: 2500,
   sampleIntervalMs: 250,
   settleDurationMs: 400,
   maxSettleDurationMs: 2500,
@@ -90,6 +94,7 @@ export interface RecordingState {
   accumulatedPausedMs: number
   eventCount: number
   screenshotCount: number
+  audioChunkCount: number
   outputPath: string | null
   remoteRecordingId: string | null
   remoteSessionId: string | null
@@ -107,6 +112,7 @@ export interface RecordingSessionManifest {
   options: RecordingOptions
   eventCount: number
   screenshotCount: number
+  audioChunkCount: number
 }
 
 export interface RecordedEvent {
@@ -132,13 +138,25 @@ export interface ScreenshotRecord {
   capture: ScreenshotCaptureMetadata
 }
 
+export interface AudioChunkRecord {
+  id: string
+  sequence: number
+  capturedAt: string
+  filename: string
+  mimeType: string
+  source: 'microphone'
+  durationMs: number | null
+  payloadSize: number
+  contentHash: string
+}
+
 export interface RecordingApi {
   start: (options?: Partial<RecordingOptions>) => Promise<RecordingState>
   pause: () => Promise<RecordingState>
   resume: () => Promise<RecordingState>
   stop: () => Promise<RecordingState>
   getState: () => Promise<RecordingState>
-  openPermissionSettings: (permission: 'accessibility' | 'screen') => Promise<void>
+  openPermissionSettings: (permission: 'accessibility' | 'screen' | 'microphone') => Promise<void>
   onStateChanged: (listener: (state: RecordingState) => void) => () => void
 }
 
@@ -152,5 +170,28 @@ export const recordingIpc = {
   stateChanged: 'recording:state-changed',
   frameSample: 'recording:frame-sample',
   captureReady: 'recording:capture-ready',
-  captureError: 'recording:capture-error'
+  captureError: 'recording:capture-error',
+  audioReady: 'recording:audio-ready',
+  audioStart: 'recording:audio-start',
+  audioPause: 'recording:audio-pause',
+  audioResume: 'recording:audio-resume',
+  audioStop: 'recording:audio-stop',
+  audioStopped: 'recording:audio-stopped',
+  audioChunk: 'recording:audio-chunk',
+  audioError: 'recording:audio-error'
 } as const
+
+export interface AudioRecorderApi {
+  ready: () => void
+  chunk: (chunk: {
+    capturedAt: string
+    mimeType: string
+    data: ArrayBuffer
+  }) => Promise<void>
+  error: (message: string) => void
+  stopped: () => void
+  onStart: (listener: (options: { timesliceMs: number }) => void) => () => void
+  onPause: (listener: () => void) => () => void
+  onResume: (listener: () => void) => () => void
+  onStop: (listener: () => void) => () => void
+}

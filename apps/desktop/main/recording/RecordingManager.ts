@@ -10,6 +10,7 @@ import { SessionWriter } from './SessionWriter'
 import { ScreenCaptureService } from './ScreenCaptureService'
 import { InputEventService } from './InputEventService'
 import { RecordingUploader } from './RecordingUploader'
+import { AudioCaptureService } from './AudioCaptureService'
 
 const idleState: RecordingState = {
   status: 'idle',
@@ -20,6 +21,7 @@ const idleState: RecordingState = {
   accumulatedPausedMs: 0,
   eventCount: 0,
   screenshotCount: 0,
+  audioChunkCount: 0,
   outputPath: null,
   remoteRecordingId: null,
   remoteSessionId: null,
@@ -42,6 +44,7 @@ export class RecordingManager extends EventEmitter {
     private readonly sessionWriter: SessionWriter,
     private readonly screenCapture: ScreenCaptureService,
     private readonly inputEvents: InputEventService,
+    private readonly audioCapture: AudioCaptureService,
     private readonly recordingUploader: RecordingUploader,
     private readonly shouldIgnoreInputPoint: (x: number, y: number) => boolean
   ) {
@@ -99,6 +102,21 @@ export class RecordingManager extends EventEmitter {
     }
 
     try {
+      await this.audioCapture.start(this.options, {
+        onAudioChunkSaved: () => {
+          this.updateState({ audioChunkCount: this.state.audioChunkCount + 1 })
+        },
+        onError: (error) => {
+          this.updateState({
+            status: 'error',
+            error: error.message
+          })
+          void this.sessionWriter.setStatus('error')
+          void this.inputEvents.stop().catch(() => {})
+          void this.screenCapture.stop().catch(() => {})
+          void this.audioCapture.stop().catch(() => {})
+        }
+      })
       await this.screenCapture.start(this.options, {
         onScreenshotSaved: () => {
           this.updateState({ screenshotCount: this.state.screenshotCount + 1 })
@@ -111,12 +129,14 @@ export class RecordingManager extends EventEmitter {
           void this.sessionWriter.setStatus('error')
           void this.inputEvents.stop().catch(() => {})
           void this.screenCapture.stop().catch(() => {})
+          void this.audioCapture.stop().catch(() => {})
         }
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Screen capture could not start.'
       this.updateState({ status: 'error', error: message })
       await this.sessionWriter.setStatus('error')
+      await this.audioCapture.stop()
       throw error
     }
 
@@ -139,6 +159,7 @@ export class RecordingManager extends EventEmitter {
       })
     } catch (error) {
       await this.screenCapture.stop()
+      await this.audioCapture.stop()
       const message = error instanceof Error ? error.message : 'Input capture could not start.'
       this.updateState({ status: 'error', error: message })
       await this.sessionWriter.setStatus('error')
@@ -157,6 +178,7 @@ export class RecordingManager extends EventEmitter {
     })
     await this.inputEvents.pause()
     this.screenCapture.pause()
+    this.audioCapture.pause()
     await this.sessionWriter.setStatus('paused')
     return this.getState()
   }
@@ -175,6 +197,7 @@ export class RecordingManager extends EventEmitter {
     })
     this.inputEvents.resume()
     this.screenCapture.resume()
+    this.audioCapture.resume()
     await this.sessionWriter.setStatus('recording')
     return this.getState()
   }
@@ -197,6 +220,7 @@ export class RecordingManager extends EventEmitter {
 
     await this.inputEvents.stop()
     await this.screenCapture.stop()
+    await this.audioCapture.stop()
     this.updateState({ status: 'uploading' })
     await this.sessionWriter.setStatus('completed')
     const sessionPath = this.state.outputPath

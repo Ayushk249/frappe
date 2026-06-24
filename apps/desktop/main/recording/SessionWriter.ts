@@ -1,6 +1,7 @@
 import { appendFile, mkdir, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type {
+  AudioChunkRecord,
   RecordedEvent,
   RecordingOptions,
   RecordingPlatform,
@@ -36,6 +37,7 @@ export class SessionWriter {
     return this.enqueue(async () => {
       this.sessionPath = join(this.recordingsPath, id)
       await mkdir(join(this.sessionPath, 'screenshots'), { recursive: true })
+      await mkdir(join(this.sessionPath, 'audio'), { recursive: true })
 
       this.manifest = {
         schemaVersion: 1,
@@ -47,12 +49,14 @@ export class SessionWriter {
         status: 'recording',
         options,
         eventCount: 0,
-        screenshotCount: 0
+        screenshotCount: 0,
+        audioChunkCount: 0
       }
 
       await this.writeManifest()
       await writeFile(join(this.sessionPath, 'events.jsonl'), '')
       await writeFile(join(this.sessionPath, 'screenshots.jsonl'), '')
+      await writeFile(join(this.sessionPath, 'audio.jsonl'), '')
       return this.sessionPath
     })
   }
@@ -85,6 +89,16 @@ export class SessionWriter {
       await writeFile(join(sessionPath, 'screenshots', record.filename), png)
       await appendFile(join(sessionPath, 'screenshots.jsonl'), `${JSON.stringify(record)}\n`)
       manifest.screenshotCount += 1
+      await this.writeManifest()
+    })
+  }
+
+  async appendAudioChunk(record: AudioChunkRecord, payload: Uint8Array): Promise<void> {
+    return this.enqueue(async () => {
+      const { manifest, sessionPath } = this.requireSession()
+      await writeFile(join(sessionPath, 'audio', record.filename), payload)
+      await appendFile(join(sessionPath, 'audio.jsonl'), `${JSON.stringify(record)}\n`)
+      manifest.audioChunkCount += 1
       await this.writeManifest()
     })
   }

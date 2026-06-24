@@ -38,6 +38,8 @@ export function RecorderCard() {
   const permissionError = error?.toLowerCase().includes('permission')
   const permissionType = error?.toLowerCase().includes('screen recording')
     ? 'screen'
+    : error?.toLowerCase().includes('microphone')
+      ? 'microphone'
     : 'accessibility'
 
   const toggleRecording = useCallback(() => {
@@ -120,8 +122,8 @@ export function RecorderCard() {
 
         <p className="mt-8 max-w-xl text-base leading-7 text-white/65">
           {isRecording || isPaused
-            ? 'Your desktop activity is being captured. Complete the workflow naturally, then stop when you are finished.'
-            : 'Click below to start recording your desktop activity. AI will automatically segment workflows and generate documentation.'}
+            ? 'Your desktop activity and microphone narration are being captured. Complete the workflow naturally, then stop when you are finished.'
+            : 'Click below to start recording your desktop activity and narration. AI will automatically segment workflows and generate documentation.'}
         </p>
 
         <button
@@ -192,6 +194,8 @@ export function RecorderCard() {
             </svg>
             Full Desktop Mode
           </span>
+          <span className="hidden h-5 w-px bg-white/15 sm:block" />
+          <span>Mic Audio</span>
         </div>
       </div>
     </section>

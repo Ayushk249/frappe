@@ -24,13 +24,17 @@ export function registerRecordingIpc(manager: RecordingManager): () => void {
   ipcMain.handle(recordingIpc.getState, () => manager.getState())
   ipcMain.handle(
     recordingIpc.openPermissionSettings,
-    (_event, permission: 'accessibility' | 'screen') => {
+    (_event, permission: 'accessibility' | 'screen' | 'microphone') => {
       if (process.platform !== 'darwin') {
         return
       }
 
       const pane =
-        permission === 'accessibility' ? 'Privacy_Accessibility' : 'Privacy_ScreenCapture'
+        permission === 'accessibility'
+          ? 'Privacy_Accessibility'
+          : permission === 'microphone'
+            ? 'Privacy_Microphone'
+            : 'Privacy_ScreenCapture'
       return shell.openExternal(
         `x-apple.systempreferences:com.apple.preference.security?${pane}`
       )

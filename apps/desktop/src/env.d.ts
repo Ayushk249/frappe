@@ -1,5 +1,5 @@
 import type { ConnectionApi } from '../shared/connection'
-import type { RecordingApi } from '../shared/recording'
+import type { AudioRecorderApi, RecordingApi } from '../shared/recording'
 
 export {}
 
@@ -12,5 +12,6 @@ declare global {
       connection: ConnectionApi
       recording: RecordingApi
     }
+    audioRecorder: AudioRecorderApi
   }
 }
