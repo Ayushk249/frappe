@@ -11,6 +11,52 @@ export type RecordingStatus =
 
 export type CaptureMode = 'full-desktop' | 'display'
 export type RecordingPlatform = 'darwin' | 'win32' | 'linux'
+export type CaptureCoordinateSpace = 'global-screen' | 'display-dip' | 'display-pixels'
+
+export type RecordingJsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | RecordingJsonValue[]
+  | { [key: string]: RecordingJsonValue }
+
+export type RecordingEventData = Record<string, RecordingJsonValue>
+
+export interface CaptureRectangle {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface CaptureDisplayMetadata {
+  id: string
+  scaleFactor: number
+  bounds: CaptureRectangle
+  workArea: CaptureRectangle
+}
+
+export interface PointerCaptureMetadata {
+  coordinateSpace: CaptureCoordinateSpace
+  x: number
+  y: number
+  displayId: string
+  displayScaleFactor: number
+  pointOnDisplay: {
+    x: number
+    y: number
+  }
+}
+
+export interface ScreenshotCaptureMetadata {
+  coordinateSpace: CaptureCoordinateSpace
+  display: CaptureDisplayMetadata
+  imageSize: {
+    width: number
+    height: number
+  }
+}
 
 export interface RecordingOptions {
   name?: string
@@ -65,7 +111,7 @@ export interface RecordedEvent {
   sequence: number
   timestamp: string
   type: 'click' | 'key' | 'scroll' | 'app-switch' | 'navigation'
-  data: Record<string, string | number | boolean | string[]>
+  data: RecordingEventData
   beforeScreenshotId?: string
   afterScreenshotId?: string
 }
@@ -80,6 +126,7 @@ export interface ScreenshotRecord {
   height: number
   changeScore: number
   contentHash: string
+  capture: ScreenshotCaptureMetadata
 }
 
 export interface RecordingApi {

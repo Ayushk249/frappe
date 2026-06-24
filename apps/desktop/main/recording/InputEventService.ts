@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { systemPreferences } from 'electron'
+import { screen, systemPreferences } from 'electron'
 import {
   UiohookKey,
   WheelDirection,
@@ -162,7 +162,8 @@ export class InputEventService {
       y: event.y,
       button: normalizeMouseButton(event.button),
       clickCount: event.clicks,
-      modifiers: getModifiers(event)
+      modifiers: getModifiers(event),
+      pointer: getPointerMetadata(event.x, event.y)
     })
   }
 
@@ -266,7 +267,8 @@ export class InputEventService {
       y: burst.y,
       deltaX: burst.deltaX,
       deltaY: burst.deltaY,
-      durationMs: burst.lastAt - burst.startedAt
+      durationMs: burst.lastAt - burst.startedAt,
+      pointer: getPointerMetadata(burst.x, burst.y)
     })
   }
 
@@ -363,4 +365,20 @@ function normalizeMouseButton(button: unknown): string {
   if (button === 2) return 'right'
   if (button === 3) return 'middle'
   return 'other'
+}
+
+function getPointerMetadata(x: number, y: number) {
+  const display = screen.getDisplayNearestPoint({ x, y })
+
+  return {
+    coordinateSpace: 'global-screen',
+    x,
+    y,
+    displayId: display.id.toString(),
+    displayScaleFactor: display.scaleFactor,
+    pointOnDisplay: {
+      x: x - display.bounds.x,
+      y: y - display.bounds.y
+    }
+  }
 }

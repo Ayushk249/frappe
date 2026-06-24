@@ -1,6 +1,16 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { desktopCapturer, screen, systemPreferences, type DesktopCapturerSource } from 'electron'
-import type { RecordingOptions, ScreenshotRecord } from '../../shared/recording'
+import {
+  desktopCapturer,
+  screen,
+  systemPreferences,
+  type DesktopCapturerSource,
+  type Display
+} from 'electron'
+import type {
+  CaptureDisplayMetadata,
+  RecordingOptions,
+  ScreenshotRecord
+} from '../../shared/recording'
 import { SessionWriter } from './SessionWriter'
 
 interface ScreenCaptureCallbacks {
@@ -175,6 +185,7 @@ export class ScreenCaptureService {
     const height = Math.round(display.size.height * display.scaleFactor)
     const source = await this.getDisplaySource({ width, height })
     const png = source.thumbnail.toPNG()
+    const imageSize = source.thumbnail.getSize()
     const sequence = ++this.screenshotSequence
     const id = randomUUID()
     const record: ScreenshotRecord = {
@@ -183,10 +194,15 @@ export class ScreenCaptureService {
       capturedAt: new Date().toISOString(),
       eventIds: [...this.pendingEventIds],
       filename: `${sequence.toString().padStart(5, '0')}-${id}.png`,
-      width: source.thumbnail.getSize().width,
-      height: source.thumbnail.getSize().height,
+      width: imageSize.width,
+      height: imageSize.height,
       changeScore,
-      contentHash: createHash('sha256').update(png).digest('hex')
+      contentHash: createHash('sha256').update(png).digest('hex'),
+      capture: {
+        coordinateSpace: 'display-pixels',
+        display: serializeDisplay(display),
+        imageSize
+      }
     }
 
     await this.sessionWriter.appendScreenshot(record, png)
@@ -291,6 +307,25 @@ export class ScreenCaptureService {
     this.options = null
     this.callbacks = null
     this.resetPendingChange()
+  }
+}
+
+function serializeDisplay(display: Display): CaptureDisplayMetadata {
+  return {
+    id: display.id.toString(),
+    scaleFactor: display.scaleFactor,
+    bounds: {
+      x: display.bounds.x,
+      y: display.bounds.y,
+      width: display.bounds.width,
+      height: display.bounds.height
+    },
+    workArea: {
+      x: display.workArea.x,
+      y: display.workArea.y,
+      width: display.workArea.width,
+      height: display.workArea.height
+    }
   }
 }
 
