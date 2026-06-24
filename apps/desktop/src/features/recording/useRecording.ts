@@ -11,6 +11,8 @@ const initialState: RecordingState = {
   eventCount: 0,
   screenshotCount: 0,
   outputPath: null,
+  remoteRecordingId: null,
+  remoteSessionId: null,
   error: null
 }
 

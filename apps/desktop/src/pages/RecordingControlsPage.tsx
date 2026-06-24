@@ -40,7 +40,10 @@ export function RecordingControlsPage() {
 
   const elapsed = useMemo(() => (state ? formatElapsed(state, now) : '00:00'), [now, state])
   const isPaused = state?.status === 'paused'
-  const isBusy = state?.status === 'stopping' || state?.status === 'processing'
+  const isBusy =
+    state?.status === 'stopping' ||
+    state?.status === 'uploading' ||
+    state?.status === 'processing'
 
   return (
     <main className="flex h-screen items-center justify-center bg-transparent p-1.5">

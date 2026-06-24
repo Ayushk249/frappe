@@ -19,6 +19,26 @@ interface ApiAuthSession {
   account: ApiAccount
 }
 
+interface ApiRecording {
+  id: string
+  session_id: string | null
+  workflow_name: string
+  status: string
+  has_audio: boolean
+}
+
+interface RecordingChunkUpload {
+  contentType: 'events' | 'screenshots' | 'audio'
+  mediaType: string
+  timestampStartMs: number
+  timestampEndMs: number
+  checksumSha256: string
+  idempotencyKey: string
+  payload: Uint8Array
+  filename: string
+  metadata: Record<string, unknown>
+}
+
 export class WorkTraceApiClient {
   constructor(private readonly settings: ConnectionSettingsStore) {}
 
@@ -79,6 +99,58 @@ export class WorkTraceApiClient {
     } catch (error) {
       return this.settings.setError(error)
     }
+  }
+
+  async createRecording(payload: {
+    workflowName: string
+    hasAudio: boolean
+  }): Promise<ApiRecording> {
+    const response = await this.request('/recordings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        workflow_name: payload.workflowName,
+        source_type: 'desktop',
+        has_audio: payload.hasAudio
+      })
+    })
+    return (await response.json()) as ApiRecording
+  }
+
+  async uploadRecordingChunk(
+    recordingId: string,
+    chunkIndex: number,
+    chunk: RecordingChunkUpload
+  ): Promise<void> {
+    const filePayload: Uint8Array<ArrayBuffer> = new Uint8Array(chunk.payload.byteLength)
+    filePayload.set(chunk.payload)
+    const form = new FormData()
+    form.set('content_type', chunk.contentType)
+    form.set('timestamp_start_ms', String(chunk.timestampStartMs))
+    form.set('timestamp_end_ms', String(chunk.timestampEndMs))
+    form.set('checksum_sha256', chunk.checksumSha256)
+    form.set('idempotency_key', chunk.idempotencyKey)
+    form.set('payload_size', String(chunk.payload.byteLength))
+    form.set('metadata_json', JSON.stringify(chunk.metadata))
+    form.set(
+      'file',
+      new Blob([filePayload], { type: chunk.mediaType }),
+      chunk.filename
+    )
+
+    await this.request(`/recordings/${recordingId}/chunks/${chunkIndex}`, {
+      method: 'PUT',
+      body: form
+    })
+  }
+
+  async completeRecording(recordingId: string, expectedChunkCount: number): Promise<ApiRecording> {
+    const response = await this.request(`/recordings/${recordingId}/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expected_chunk_count: expectedChunkCount })
+    })
+    return (await response.json()) as ApiRecording
   }
 
   async request(path: string, init: RequestInit = {}): Promise<Response> {

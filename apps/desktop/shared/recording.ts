@@ -5,6 +5,7 @@ export type RecordingStatus =
   | 'recording'
   | 'paused'
   | 'stopping'
+  | 'uploading'
   | 'processing'
   | 'completed'
   | 'error'
@@ -90,6 +91,8 @@ export interface RecordingState {
   eventCount: number
   screenshotCount: number
   outputPath: string | null
+  remoteRecordingId: string | null
+  remoteSessionId: string | null
   error: string | null
 }
 

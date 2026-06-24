@@ -29,6 +29,7 @@ export class RecordingControlsWindow {
       state.status === 'recording' ||
       state.status === 'paused' ||
       state.status === 'stopping' ||
+      state.status === 'uploading' ||
       state.status === 'processing'
     ) {
       this.show()

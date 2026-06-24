@@ -11,6 +11,7 @@ import { RecordingControlsWindow } from './recording/RecordingControlsWindow'
 import { InputEventService } from './recording/InputEventService'
 import { ScreenCaptureService } from './recording/ScreenCaptureService'
 import { SessionWriter } from './recording/SessionWriter'
+import { RecordingUploader } from './recording/RecordingUploader'
 import { registerRecordingIpc } from './recording/registerRecordingIpc'
 
 let recordingManager: RecordingManager | null = null
@@ -61,10 +62,12 @@ app.whenReady().then(async () => {
   const screenCapture = new ScreenCaptureService(sessionWriter)
   recordingControlsWindow = new RecordingControlsWindow(process.env['ELECTRON_RENDERER_URL'])
   const inputEvents = new InputEventService(sessionWriter)
+  const recordingUploader = new RecordingUploader(apiClient)
   recordingManager = new RecordingManager(
     sessionWriter,
     screenCapture,
     inputEvents,
+    recordingUploader,
     (x, y) => recordingControlsWindow?.containsPoint(x, y) ?? false
   )
   registerRecordingIpc(recordingManager)

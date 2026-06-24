@@ -33,6 +33,7 @@ export function RecorderCard() {
     status === 'requesting-permissions' ||
     status === 'starting' ||
     status === 'stopping' ||
+    status === 'uploading' ||
     status === 'processing'
   const permissionError = error?.toLowerCase().includes('permission')
   const permissionType = error?.toLowerCase().includes('screen recording')
@@ -144,6 +145,10 @@ export function RecorderCard() {
             ? 'Starting...'
             : status === 'stopping'
               ? 'Saving...'
+              : status === 'uploading'
+                ? 'Uploading...'
+                : status === 'processing'
+                  ? 'Processing...'
               : isRecording || isPaused
                 ? 'Stop Recording'
                 : 'Start Recording'}

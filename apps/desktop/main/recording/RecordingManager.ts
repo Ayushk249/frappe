@@ -9,6 +9,7 @@ import {
 import { SessionWriter } from './SessionWriter'
 import { ScreenCaptureService } from './ScreenCaptureService'
 import { InputEventService } from './InputEventService'
+import { RecordingUploader } from './RecordingUploader'
 
 const idleState: RecordingState = {
   status: 'idle',
@@ -20,6 +21,8 @@ const idleState: RecordingState = {
   eventCount: 0,
   screenshotCount: 0,
   outputPath: null,
+  remoteRecordingId: null,
+  remoteSessionId: null,
   error: null
 }
 
@@ -39,6 +42,7 @@ export class RecordingManager extends EventEmitter {
     private readonly sessionWriter: SessionWriter,
     private readonly screenCapture: ScreenCaptureService,
     private readonly inputEvents: InputEventService,
+    private readonly recordingUploader: RecordingUploader,
     private readonly shouldIgnoreInputPoint: (x: number, y: number) => boolean
   ) {
     super()
@@ -193,8 +197,29 @@ export class RecordingManager extends EventEmitter {
 
     await this.inputEvents.stop()
     await this.screenCapture.stop()
-    this.updateState({ status: 'processing' })
+    this.updateState({ status: 'uploading' })
     await this.sessionWriter.setStatus('completed')
+    const sessionPath = this.state.outputPath
+    if (!sessionPath) {
+      throw new Error('Recording was saved without an output path.')
+    }
+
+    try {
+      const remoteRecording = await this.recordingUploader.uploadCompletedSession(sessionPath)
+      this.updateState({
+        status: 'processing',
+        remoteRecordingId: remoteRecording.recordingId,
+        remoteSessionId: remoteRecording.sessionId
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Recording upload failed.'
+      this.updateState({
+        status: 'error',
+        error: `Recording is saved locally, but upload failed: ${message}`
+      })
+      throw error
+    }
+
     this.updateState({ status: 'completed' })
     return this.getState()
   }
