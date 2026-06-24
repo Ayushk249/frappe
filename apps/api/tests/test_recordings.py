@@ -33,6 +33,7 @@ def upload_chunk(
     content_type=None,
     metadata=None,
     media_type="application/octet-stream",
+    filename=None,
 ):
     checksum = checksum or hashlib.sha256(payload).hexdigest()
     return client.put(
@@ -47,7 +48,7 @@ def upload_chunk(
             "payload_size": len(payload),
             "metadata_json": json.dumps(metadata or {}),
         },
-        files={"file": (f"chunk-{index}.bin", payload, media_type)},
+        files={"file": (filename or f"chunk-{index}.bin", payload, media_type)},
     )
 
 
@@ -374,7 +375,8 @@ def test_uploaded_chunks_keep_readable_file_extensions(client):
         0,
         png,
         content_type="screenshots",
-        media_type="image/png",
+        media_type="application/octet-stream",
+        filename="captured-screen.webp",
     )
     event = upload_chunk(
         client,
@@ -382,7 +384,8 @@ def test_uploaded_chunks_keep_readable_file_extensions(client):
         1,
         events,
         content_type="events",
-        media_type="application/x-ndjson",
+        media_type="application/octet-stream",
+        filename="events.jsonl",
     )
     audio = upload_chunk(
         client,
@@ -390,7 +393,8 @@ def test_uploaded_chunks_keep_readable_file_extensions(client):
         2,
         b"audio-bytes",
         content_type="audio",
-        media_type="audio/webm",
+        media_type="application/octet-stream",
+        filename="voice-note.ogg",
     )
 
     assert screenshot.status_code == 200
@@ -400,9 +404,9 @@ def test_uploaded_chunks_keep_readable_file_extensions(client):
     recording_dir = (
         Path(__file__).parent / "data" / "recordings" / TEST_TENANT_ID / recording["id"]
     )
-    assert (recording_dir / "00000000-screenshots.png").exists()
+    assert (recording_dir / "00000000-screenshots.webp").exists()
     assert (recording_dir / "00000001-events.jsonl").exists()
-    assert (recording_dir / "00000002-audio.webm").exists()
+    assert (recording_dir / "00000002-audio.ogg").exists()
 
 
 def test_rejects_conflicting_duplicate(client):

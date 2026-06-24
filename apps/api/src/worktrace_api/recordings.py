@@ -22,6 +22,7 @@ class ChunkStorage:
         chunk_index: int,
         content_type: ChunkContentType,
         media_type: str,
+        original_filename: str | None,
         payload: bytes,
         expected_checksum: str,
     ) -> tuple[str, int]:
@@ -30,7 +31,8 @@ class ChunkStorage:
         directory = self.root / str(tenant_id) / str(recording_id)
         directory.mkdir(parents=True, exist_ok=True)
         destination = directory / (
-            f"{chunk_index:08d}-{content_type.value}{chunk_extension(content_type, media_type)}"
+            f"{chunk_index:08d}-{content_type.value}"
+            f"{chunk_extension(content_type, media_type, original_filename)}"
         )
         temporary = destination.with_suffix(".tmp")
         temporary.write_bytes(payload)
@@ -94,7 +96,15 @@ class ChunkStorage:
         return str(destination.relative_to(self.root)), payload_size, digest.hexdigest()
 
 
-def chunk_extension(content_type: ChunkContentType, media_type: str) -> str:
+def chunk_extension(
+    content_type: ChunkContentType,
+    media_type: str,
+    original_filename: str | None = None,
+) -> str:
+    preserved_extension = safe_original_extension(content_type, original_filename)
+    if preserved_extension:
+        return preserved_extension
+
     normalized = media_type.split(";", 1)[0].strip().lower()
 
     if content_type == ChunkContentType.SCREENSHOTS:
@@ -121,3 +131,23 @@ def chunk_extension(content_type: ChunkContentType, media_type: str) -> str:
         }.get(normalized, ".audio")
 
     return ".bin"
+
+
+def safe_original_extension(
+    content_type: ChunkContentType, original_filename: str | None
+) -> str | None:
+    if not original_filename:
+        return None
+
+    extension = Path(original_filename).suffix.lower()
+    if not extension:
+        return None
+
+    allowed_extensions = {
+        ChunkContentType.SCREENSHOTS: {".png", ".jpg", ".jpeg", ".webp"},
+        ChunkContentType.EVENTS: {".jsonl", ".ndjson", ".json"},
+        ChunkContentType.AUDIO: {".webm", ".ogg", ".wav", ".mp3", ".m4a", ".mp4"},
+    }
+    if extension not in allowed_extensions.get(content_type, set()):
+        return None
+    return extension
