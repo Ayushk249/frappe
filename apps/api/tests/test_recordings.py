@@ -1,10 +1,15 @@
 import hashlib
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
 from conftest import TEST_TENANT_ID
+from sqlalchemy.exc import IntegrityError
 from test_api import auth_headers
+
+from worktrace_api.database import RecordingRecord, SessionLocal
 
 
 def create_recording(client, has_audio=True):
@@ -417,6 +422,68 @@ def test_rejects_conflicting_duplicate(client):
         checksum=hashlib.sha256(b"first").hexdigest(),
     )
     assert forged_retry.status_code == 409
+
+
+def test_rejects_reused_idempotency_key_on_different_chunk(client):
+    recording = create_recording(client)
+    assert (
+        upload_chunk(
+            client,
+            recording["id"],
+            0,
+            b"first",
+            idempotency_key=f"{recording['id']}:shared-key",
+        ).status_code
+        == 200
+    )
+
+    conflict = upload_chunk(
+        client,
+        recording["id"],
+        1,
+        b"second",
+        idempotency_key=f"{recording['id']}:shared-key",
+    )
+
+    assert conflict.status_code == 409
+    assert "idempotency key" in conflict.json()["detail"]
+
+
+def test_recording_foreign_keys_are_enforced():
+    with SessionLocal() as db:
+        db.add(
+            RecordingRecord(
+                id=str(uuid4()),
+                tenant_id=TEST_TENANT_ID,
+                session_id=str(uuid4()),
+                source_type="desktop",
+                workflow_name="Broken session link",
+                status="recording",
+                uploaded_chunk_count=0,
+                uploaded_bytes=0,
+                has_audio=False,
+                created_at=datetime.now(UTC),
+            )
+        )
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
+
+        db.add(
+            RecordingRecord(
+                id=str(uuid4()),
+                tenant_id=str(uuid4()),
+                source_type="desktop",
+                workflow_name="Broken tenant link",
+                status="recording",
+                uploaded_chunk_count=0,
+                uploaded_bytes=0,
+                has_audio=False,
+                created_at=datetime.now(UTC),
+            )
+        )
+        with pytest.raises(IntegrityError):
+            db.commit()
 
 
 def test_delete_recording_removes_metadata_and_raw_chunks(client):

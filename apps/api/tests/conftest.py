@@ -38,6 +38,7 @@ def clean_database():
                 name="Test Company",
             )
         )
+        db.flush()
         db.add(
             UserRecord(
                 id=TEST_USER_ID,
@@ -48,6 +49,7 @@ def clean_database():
                 is_active=True,
             )
         )
+        db.flush()
         db.add(
             AccessTokenRecord(
                 id="00000000-0000-4000-8000-000000000097",

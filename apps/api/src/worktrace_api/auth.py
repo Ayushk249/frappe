@@ -36,18 +36,19 @@ def sign_up(db: Session, payload: SignUpRequest, token_ttl_hours: int) -> AuthSe
             created_at=now,
         )
     )
-    db.add(
-        UserRecord(
-            id=str(user_id),
-            tenant_id=str(tenant_id),
-            email=payload.email,
-            password_hash=hash_password(payload.password),
-            role=AccountRole.OWNER,
-            is_active=True,
-            created_at=now,
-        )
-    )
     try:
+        db.flush()
+        db.add(
+            UserRecord(
+                id=str(user_id),
+                tenant_id=str(tenant_id),
+                email=payload.email,
+                password_hash=hash_password(payload.password),
+                role=AccountRole.OWNER,
+                is_active=True,
+                created_at=now,
+            )
+        )
         db.flush()
         result = _issue_token(
             db,

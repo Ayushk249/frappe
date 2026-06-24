@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import Select, delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from worktrace_api.database import (
@@ -169,6 +170,12 @@ class Repository:
             raise LookupError("Recording not found")
         if recording.status not in {RecordingStatus.RECORDING, RecordingStatus.UPLOADING}:
             raise ValueError("Recording no longer accepts chunks")
+        if self.db.scalar(
+            tenant_query(RecordingChunkRecord, self.tenant_id).where(
+                RecordingChunkRecord.idempotency_key == idempotency_key
+            )
+        ):
+            raise ValueError("Chunk idempotency key already exists with different content")
 
         self.db.add(
             RecordingChunkRecord(
@@ -189,7 +196,11 @@ class Repository:
         recording.status = RecordingStatus.UPLOADING
         recording.uploaded_chunk_count = RecordingRecord.uploaded_chunk_count + 1
         recording.uploaded_bytes = RecordingRecord.uploaded_bytes + payload_size
-        self.db.commit()
+        try:
+            self.db.commit()
+        except IntegrityError as exc:
+            self.db.rollback()
+            raise ValueError("Chunk violates recording uniqueness constraints") from exc
         return ChunkReceipt(
             recording_id=recording_id,
             chunk_index=chunk_index,

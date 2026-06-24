@@ -11,8 +11,9 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     create_engine,
+    event,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column, sessionmaker
 
 from worktrace_api.settings import get_settings
 
@@ -22,7 +23,9 @@ class Base(DeclarativeBase):
 
 
 class TenantRecord:
-    tenant_id: Mapped[str] = mapped_column(String(36), index=True)
+    @declared_attr
+    def tenant_id(cls) -> Mapped[str]:
+        return mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
 
 
 class TenantAccountRecord(Base):
@@ -154,7 +157,16 @@ class RecordingRecord(TenantRecord, Base):
     __tablename__ = "recordings"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    session_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    session_id: Mapped[str | None] = mapped_column(
+        ForeignKey(
+            "workflow_sessions.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_recordings_session_id",
+        ),
+        nullable=True,
+        index=True,
+    )
     source_type: Mapped[str] = mapped_column(String(20), index=True)
     workflow_name: Mapped[str] = mapped_column(String(200), index=True)
     status: Mapped[str] = mapped_column(String(50), index=True)
@@ -171,6 +183,9 @@ class RecordingRecord(TenantRecord, Base):
 
 class RecordingChunkRecord(TenantRecord, Base):
     __tablename__ = "recording_chunks"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "idempotency_key", name="uq_recording_chunk_idempotency"),
+    )
 
     recording_id: Mapped[str] = mapped_column(
         ForeignKey("recordings.id", ondelete="CASCADE"), primary_key=True
@@ -221,6 +236,17 @@ class ScreenshotRecord(TenantRecord, Base):
 settings = get_settings()
 connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
 engine = create_engine(settings.database_url, connect_args=connect_args, pool_pre_ping=True)
+
+
+if settings.database_url.startswith("sqlite"):
+
+    @event.listens_for(engine, "connect")
+    def enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 
