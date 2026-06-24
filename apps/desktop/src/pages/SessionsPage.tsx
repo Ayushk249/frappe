@@ -129,7 +129,7 @@ function stageState(stage: BackendRecordingStatus, session: RecordedSessionSumma
 
 function EmptyState({ onRefresh }: { onRefresh: () => void }) {
   return (
-    <section className="grid min-h-[calc(100vh-4rem)] place-items-center px-6 py-16">
+    <section className="grid h-[calc(100vh-4rem)] place-items-center overflow-hidden px-6 py-16">
       <div className="max-w-lg rounded-2xl border border-white/10 bg-white/[0.03] p-10 text-center shadow-[0_18px_65px_rgba(0,0,0,0.45)]">
         <span className="mx-auto block size-2.5 rounded-full bg-red-500 shadow-[0_0_16px_rgba(239,68,68,0.6)]" />
         <p className="mt-5 font-mono text-xs font-semibold uppercase tracking-[0.25em] text-white/45">
@@ -266,8 +266,9 @@ export function SessionsPage() {
   }
 
   return (
-    <section className="px-5 py-8 md:px-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <section className="flex h-[calc(100vh-4rem)] min-h-0 flex-col overflow-hidden px-5 py-8 md:px-8">
+      <div className="shrink-0">
+        <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="font-mono text-xs font-bold uppercase tracking-[0.24em] text-emerald-400">
             Session archive
@@ -287,16 +288,17 @@ export function SessionsPage() {
         >
           {isLoading ? 'Refreshing...' : 'Refresh'}
         </button>
+        </div>
+
+        {error && (
+          <p className="mt-6 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            {error}
+          </p>
+        )}
       </div>
 
-      {error && (
-        <p className="mt-6 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-          {error}
-        </p>
-      )}
-
-      <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.05fr)]">
-        <div className="space-y-3">
+      <div className="mt-8 grid min-h-0 flex-1 gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.05fr)]">
+        <div className="min-h-0 space-y-3 overflow-y-auto pr-2 [scrollbar-color:rgba(255,255,255,0.2)_transparent]">
           {sessions.map((session) => {
             const isSelected = selected?.id === session.id
             return (
@@ -354,7 +356,7 @@ export function SessionsPage() {
         </div>
 
         {selected && (
-          <aside className="space-y-5">
+          <aside className="min-h-0 space-y-5 overflow-y-auto pr-2 [scrollbar-color:rgba(255,255,255,0.2)_transparent]">
             <div className="rounded-2xl border border-white/10 bg-[#0c0c0c] p-6 shadow-[0_18px_65px_rgba(0,0,0,0.42)]">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>

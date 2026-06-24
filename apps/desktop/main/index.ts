@@ -22,8 +22,10 @@ let audioCapture: AudioCaptureService | null = null
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
-    width: 1000,
-    height: 700,
+    width: 1280,
+    height: 820,
+    minWidth: 1180,
+    minHeight: 720,
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
