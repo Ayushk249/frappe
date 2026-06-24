@@ -10,6 +10,18 @@ export type RecordingStatus =
   | 'completed'
   | 'error'
 
+export type BackendRecordingStatus =
+  | 'recording'
+  | 'uploading'
+  | 'validating'
+  | 'transcribing_audio'
+  | 'processing_screenshots'
+  | 'aligning_evidence'
+  | 'generating_sop'
+  | 'ready_for_review'
+  | 'completed'
+  | 'failed'
+
 export type CaptureMode = 'full-desktop' | 'display'
 export type RecordingPlatform = 'darwin' | 'win32' | 'linux'
 export type CaptureCoordinateSpace = 'global-screen' | 'display-dip' | 'display-pixels'
@@ -101,6 +113,46 @@ export interface RecordingState {
   error: string | null
 }
 
+export interface BackendRecording {
+  id: string
+  session_id: string | null
+  workflow_name: string
+  status: BackendRecordingStatus
+  expected_chunk_count: number | null
+  uploaded_chunk_count: number
+  uploaded_bytes: number
+  has_audio: boolean
+  error_message: string | null
+  created_at: string
+  completed_at: string | null
+}
+
+export interface BackendRecordingStatusResponse {
+  recording: BackendRecording
+  stages: BackendRecordingStatus[]
+}
+
+export interface RecordedSessionSummary {
+  id: string
+  name: string
+  platform: RecordingPlatform
+  startedAt: string
+  endedAt: string | null
+  durationMs: number | null
+  localStatus: RecordingSessionManifest['status']
+  eventCount: number
+  screenshotCount: number
+  audioChunkCount: number
+  outputPath: string
+  remoteRecordingId: string | null
+  remoteSessionId: string | null
+  remoteStatus: string | null
+  uploadedAt: string | null
+  uploadError: string | null
+  backend: BackendRecordingStatusResponse | null
+  backendError: string | null
+}
+
 export interface RecordingSessionManifest {
   schemaVersion: 1
   id: string
@@ -161,6 +213,7 @@ export interface RecordingApi {
   resume: () => Promise<RecordingState>
   stop: () => Promise<RecordingState>
   getState: () => Promise<RecordingState>
+  listSessions: () => Promise<RecordedSessionSummary[]>
   openPermissionSettings: (permission: 'accessibility' | 'screen' | 'microphone') => Promise<void>
   onStateChanged: (listener: (state: RecordingState) => void) => () => void
 }
@@ -171,6 +224,7 @@ export const recordingIpc = {
   resume: 'recording:resume',
   stop: 'recording:stop',
   getState: 'recording:get-state',
+  listSessions: 'recording:list-sessions',
   openPermissionSettings: 'recording:open-permission-settings',
   stateChanged: 'recording:state-changed',
   frameSample: 'recording:frame-sample',

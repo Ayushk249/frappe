@@ -13,6 +13,7 @@ import { ScreenCaptureService } from './recording/ScreenCaptureService'
 import { SessionWriter } from './recording/SessionWriter'
 import { RecordingUploader } from './recording/RecordingUploader'
 import { AudioCaptureService } from './recording/AudioCaptureService'
+import { RecordingLibraryService } from './recording/RecordingLibraryService'
 import { registerRecordingIpc } from './recording/registerRecordingIpc'
 
 let recordingManager: RecordingManager | null = null
@@ -60,7 +61,8 @@ app.whenReady().then(async () => {
   registerConnectionIpc(connectionSettings, apiClient)
   await apiClient.testConnection()
 
-  const sessionWriter = new SessionWriter(join(app.getPath('userData'), 'recordings'))
+  const recordingsPath = join(app.getPath('userData'), 'recordings')
+  const sessionWriter = new SessionWriter(recordingsPath)
   const screenCapture = new ScreenCaptureService(sessionWriter)
   recordingControlsWindow = new RecordingControlsWindow(process.env['ELECTRON_RENDERER_URL'])
   const inputEvents = new InputEventService(sessionWriter)
@@ -74,7 +76,8 @@ app.whenReady().then(async () => {
     recordingUploader,
     (x, y) => recordingControlsWindow?.containsPoint(x, y) ?? false
   )
-  registerRecordingIpc(recordingManager)
+  const recordingLibrary = new RecordingLibraryService(recordingsPath, apiClient)
+  registerRecordingIpc(recordingManager, recordingLibrary)
   recordingManager.on('state-changed', (state) => recordingControlsWindow?.handleState(state))
 
   createWindow()

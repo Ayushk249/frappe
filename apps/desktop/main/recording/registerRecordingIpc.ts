@@ -5,8 +5,12 @@ import {
   type RecordingState
 } from '../../shared/recording'
 import { RecordingManager } from './RecordingManager'
+import { RecordingLibraryService } from './RecordingLibraryService'
 
-export function registerRecordingIpc(manager: RecordingManager): () => void {
+export function registerRecordingIpc(
+  manager: RecordingManager,
+  library: RecordingLibraryService
+): () => void {
   const broadcastState = (state: RecordingState) => {
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(recordingIpc.stateChanged, state)
@@ -22,6 +26,7 @@ export function registerRecordingIpc(manager: RecordingManager): () => void {
   ipcMain.handle(recordingIpc.resume, () => manager.resume())
   ipcMain.handle(recordingIpc.stop, () => manager.stop())
   ipcMain.handle(recordingIpc.getState, () => manager.getState())
+  ipcMain.handle(recordingIpc.listSessions, () => library.listSessions())
   ipcMain.handle(
     recordingIpc.openPermissionSettings,
     (_event, permission: 'accessibility' | 'screen' | 'microphone') => {
@@ -48,6 +53,7 @@ export function registerRecordingIpc(manager: RecordingManager): () => void {
     ipcMain.removeHandler(recordingIpc.resume)
     ipcMain.removeHandler(recordingIpc.stop)
     ipcMain.removeHandler(recordingIpc.getState)
+    ipcMain.removeHandler(recordingIpc.listSessions)
     ipcMain.removeHandler(recordingIpc.openPermissionSettings)
   }
 }

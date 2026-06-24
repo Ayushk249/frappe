@@ -4,6 +4,7 @@ import type {
   LoginCredentials,
   SignUpCredentials
 } from '../../shared/connection'
+import type { BackendRecording, BackendRecordingStatusResponse } from '../../shared/recording'
 import { ConnectionSettingsStore } from './ConnectionSettingsStore'
 
 interface ApiAccount {
@@ -17,14 +18,6 @@ interface ApiAccount {
 interface ApiAuthSession {
   access_token: string
   account: ApiAccount
-}
-
-interface ApiRecording {
-  id: string
-  session_id: string | null
-  workflow_name: string
-  status: string
-  has_audio: boolean
 }
 
 interface RecordingChunkUpload {
@@ -104,7 +97,7 @@ export class WorkTraceApiClient {
   async createRecording(payload: {
     workflowName: string
     hasAudio: boolean
-  }): Promise<ApiRecording> {
+  }): Promise<BackendRecording> {
     const response = await this.request('/recordings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -114,7 +107,7 @@ export class WorkTraceApiClient {
         has_audio: payload.hasAudio
       })
     })
-    return (await response.json()) as ApiRecording
+    return (await response.json()) as BackendRecording
   }
 
   async uploadRecordingChunk(
@@ -144,13 +137,21 @@ export class WorkTraceApiClient {
     })
   }
 
-  async completeRecording(recordingId: string, expectedChunkCount: number): Promise<ApiRecording> {
+  async completeRecording(
+    recordingId: string,
+    expectedChunkCount: number
+  ): Promise<BackendRecording> {
     const response = await this.request(`/recordings/${recordingId}/complete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ expected_chunk_count: expectedChunkCount })
     })
-    return (await response.json()) as ApiRecording
+    return (await response.json()) as BackendRecording
+  }
+
+  async getRecordingStatus(recordingId: string): Promise<BackendRecordingStatusResponse> {
+    const response = await this.request(`/recordings/${recordingId}/status`)
+    return (await response.json()) as BackendRecordingStatusResponse
   }
 
   async request(path: string, init: RequestInit = {}): Promise<Response> {

@@ -9,6 +9,7 @@ import {
   recordingIpc,
   type AudioRecorderApi,
   type RecordingOptions,
+  type RecordedSessionSummary,
   type RecordingState
 } from '../shared/recording'
 
@@ -40,6 +41,8 @@ contextBridge.exposeInMainWorld('api', {
     resume: () => ipcRenderer.invoke(recordingIpc.resume),
     stop: () => ipcRenderer.invoke(recordingIpc.stop),
     getState: () => ipcRenderer.invoke(recordingIpc.getState),
+    listSessions: () =>
+      ipcRenderer.invoke(recordingIpc.listSessions) as Promise<RecordedSessionSummary[]>,
     openPermissionSettings: (permission: 'accessibility' | 'screen' | 'microphone') =>
       ipcRenderer.invoke(recordingIpc.openPermissionSettings, permission),
     onStateChanged: (listener: (state: RecordingState) => void) => {
