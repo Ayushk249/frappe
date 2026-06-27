@@ -24,6 +24,27 @@ the API at `http://127.0.0.1:8000` with reload enabled. Override its development
 defaults with `WORKTRACE_API_HOST`, `WORKTRACE_API_PORT`,
 `WORKTRACE_API_RELOAD=false`, or `WORKTRACE_PYTHON`.
 
+### Background Tasks (Redis & Celery)
+
+The API relies on Redis and Celery for background processing (such as annotating screenshots and generating SOPs).
+
+**1. Start Redis (via Docker)**
+```bash
+docker run -d --name redis -p 6379:6379 redis:latest redis-server --appendonly yes
+```
+
+Verify Redis is running (expected output: `PONG`):
+```bash
+docker exec -it redis redis-cli ping
+```
+
+**2. Run the Celery Worker**
+Open a new terminal, navigate to the `apps/api` directory, and run:
+```bash
+export PYTHONPATH="src"
+celery -A worktrace_api.core.celery_app worker --loglevel=info -P solo
+```
+
 Swagger UI is available at `http://localhost:8000/docs`. The checked-in
 [`openapi.json`](openapi.json) can be regenerated with:
 
