@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     ai_provider: str = "local"
     external_ai_enabled: bool = False
     external_ai_approval_required: bool = True
+    whisper_model_size: str = "tiny"
 
     @field_validator("allowed_origins", "allowed_domains", mode="before")
     @classmethod

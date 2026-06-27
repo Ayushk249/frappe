@@ -132,19 +132,41 @@ class RecordingProcessor:
         screenshot_ids: dict[str, UUID] = {}
         after_screenshot_by_event: dict[str, UUID] = {}
         after_screenshot_metadata_by_event: dict[str, dict[str, Any]] = {}
+        seen_hashes: dict[str, UUID] = {}
 
         for chunk in chunks:
             if chunk.content_type != ChunkContentType.SCREENSHOTS:
                 continue
 
             metadata = chunk.metadata_json or {}
+            content_hash = chunk.checksum_sha256
             screenshot_id = _uuid_or_default(
                 metadata.get("id"),
-                uuid5(recording_id, f"screenshot:{chunk.chunk_index}:{chunk.checksum_sha256}"),
+                uuid5(recording_id, f"screenshot:{chunk.chunk_index}:{content_hash}"),
             )
             original_id = metadata.get("id")
+
+            declared_hash = metadata.get("contentHash") or metadata.get("content_hash")
+            if declared_hash and declared_hash != content_hash:
+                raise ValueError("Screenshot content hash does not match the uploaded image")
+
+            if content_hash in seen_hashes:
+                # use existing screenshot ID 
+                existing_id = seen_hashes[content_hash]
+                if original_id:
+                    screenshot_ids[str(original_id)] = existing_id
+
+                event_ids = metadata.get("eventIds") or metadata.get("event_ids") or []
+                if isinstance(event_ids, list):
+                    for event_id in event_ids:
+                        after_screenshot_by_event[str(event_id)] = existing_id
+                        after_screenshot_metadata_by_event[str(event_id)] = metadata
+                continue
+
             if original_id:
                 screenshot_ids[str(original_id)] = screenshot_id
+
+            seen_hashes[content_hash] = screenshot_id
 
             payload = self.storage.read(chunk.storage_key)
             detected_width, detected_height = _image_dimensions(payload)
@@ -154,9 +176,7 @@ class RecordingProcessor:
                 raise ValueError("Screenshot width does not match the uploaded image")
             if declared_height is not None and int(declared_height) != detected_height:
                 raise ValueError("Screenshot height does not match the uploaded image")
-            declared_hash = metadata.get("contentHash") or metadata.get("content_hash")
-            if declared_hash and declared_hash != chunk.checksum_sha256:
-                raise ValueError("Screenshot content hash does not match the uploaded image")
+
             captured_at = _parse_datetime(
                 metadata.get("capturedAt") or metadata.get("captured_at")
             ) or datetime.now(UTC)
@@ -174,7 +194,7 @@ class RecordingProcessor:
                 change_score=float(
                     metadata.get("changeScore") or metadata.get("change_score") or 0
                 ),
-                content_hash=chunk.checksum_sha256,
+                content_hash=content_hash,
                 redaction_status="pending",
             )
             screenshots.append(screenshot)
