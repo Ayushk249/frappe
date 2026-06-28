@@ -1,6 +1,7 @@
 import type {
   BackendRecordingStatus,
-  RecordedSessionSummary
+  RecordedSessionSummary,
+  RecordingState
 } from '../../../shared/recording'
 
 export const stageLabels: Record<BackendRecordingStatus, string> = {
@@ -120,4 +121,42 @@ export function canDeleteSession(session: RecordedSessionSummary) {
 export function canRetrySession(session: RecordedSessionSummary) {
   // Retryable when something failed and the session is not mid-flight.
   return isFailed(session) && !isActiveSession(session)
+}
+
+export function activeRecordingSummary(state: RecordingState): RecordedSessionSummary | null {
+  if (
+    !state.sessionId ||
+    !state.outputPath ||
+    !state.startedAt ||
+    state.status === 'idle' ||
+    state.status === 'completed'
+  ) {
+    return null
+  }
+
+  return {
+    id: state.sessionId,
+    name: state.sessionName || 'Untitled workflow',
+    platform:
+      navigator.platform.toLowerCase().includes('win')
+        ? 'win32'
+        : navigator.platform.toLowerCase().includes('mac')
+          ? 'darwin'
+          : 'linux',
+    startedAt: state.startedAt,
+    endedAt: null,
+    durationMs: Math.max(0, Date.now() - new Date(state.startedAt).getTime()),
+    localStatus: state.status,
+    eventCount: state.eventCount,
+    screenshotCount: state.screenshotCount,
+    audioChunkCount: state.audioChunkCount,
+    outputPath: state.outputPath,
+    remoteRecordingId: state.remoteRecordingId,
+    remoteSessionId: state.remoteSessionId,
+    remoteStatus: null,
+    uploadedAt: null,
+    uploadError: state.error,
+    backend: null,
+    backendError: null
+  }
 }

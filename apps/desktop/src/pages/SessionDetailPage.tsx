@@ -7,6 +7,7 @@ import type {
 } from '../../shared/recording'
 import { useRecording } from '../features/recording/useRecording'
 import {
+  activeRecordingSummary,
   canDeleteSession,
   canRetrySession,
   formatDate,
@@ -17,45 +18,6 @@ import {
   statusLabel
 } from '../features/recording/sessionStatus'
 import { StepProgress } from '../components/StepProgress'
-
-function activeRecordingSummary(
-  state: ReturnType<typeof useRecording>['state']
-): RecordedSessionSummary | null {
-  if (
-    !state.sessionId ||
-    !state.outputPath ||
-    !state.startedAt ||
-    state.status === 'idle' ||
-    state.status === 'completed'
-  ) {
-    return null
-  }
-  return {
-    id: state.sessionId,
-    name: state.sessionName || 'Untitled workflow',
-    platform:
-      navigator.platform.toLowerCase().includes('win')
-        ? 'win32'
-        : navigator.platform.toLowerCase().includes('mac')
-          ? 'darwin'
-          : 'linux',
-    startedAt: state.startedAt,
-    endedAt: null,
-    durationMs: Math.max(0, Date.now() - new Date(state.startedAt).getTime()),
-    localStatus: state.status,
-    eventCount: state.eventCount,
-    screenshotCount: state.screenshotCount,
-    audioChunkCount: state.audioChunkCount,
-    outputPath: state.outputPath,
-    remoteRecordingId: state.remoteRecordingId,
-    remoteSessionId: state.remoteSessionId,
-    remoteStatus: null,
-    uploadedAt: null,
-    uploadError: state.error,
-    backend: null,
-    backendError: null
-  }
-}
 
 function Metric({ label, value }: { label: string; value: string | number }) {
   return (
