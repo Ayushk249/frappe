@@ -133,6 +133,28 @@ export interface BackendRecordingStatusResponse {
   stages: BackendRecordingStatus[]
 }
 
+export interface BackendTranscriptSegment {
+  start_ms: number
+  end_ms: number
+  text: string
+}
+
+export interface BackendTranscript {
+  status: string
+  text: string | null
+  segments: BackendTranscriptSegment[]
+  audio_chunk_count: number
+  audio_reference?: string | null
+}
+
+export interface BackendWorkflowSession {
+  id: string
+  workflow_name: string
+  duration_ms: number
+  status: string
+  transcript: BackendTranscript | null
+}
+
 export interface RecordedSessionSummary {
   id: string
   name: string
@@ -219,6 +241,7 @@ export interface RecordingApi {
   listSessions: () => Promise<RecordedSessionSummary[]>
   deleteSession: (sessionId: string) => Promise<void>
   retryUpload: (sessionId: string) => Promise<void>
+  getSession: (backendSessionId: string) => Promise<BackendWorkflowSession>
   openPermissionSettings: (permission: 'accessibility' | 'screen' | 'microphone') => Promise<void>
   onStateChanged: (listener: (state: RecordingState) => void) => () => void
 }
@@ -234,6 +257,7 @@ export const recordingIpc = {
   listSessions: 'recording:list-sessions',
   deleteSession: 'recording:delete-session',
   retryUpload: 'recording:retry-upload',
+  getSession: 'recording:get-session',
   openPermissionSettings: 'recording:open-permission-settings',
   stateChanged: 'recording:state-changed',
   frameSample: 'recording:frame-sample',

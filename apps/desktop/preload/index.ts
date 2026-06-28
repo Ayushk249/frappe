@@ -10,7 +10,8 @@ import {
   type AudioRecorderApi,
   type RecordingOptions,
   type RecordedSessionSummary,
-  type RecordingState
+  type RecordingState,
+  type BackendWorkflowSession
 } from '../shared/recording'
 
 // Expose a safe, minimal API to the renderer via contextBridge.
@@ -47,6 +48,8 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke(recordingIpc.listSessions) as Promise<RecordedSessionSummary[]>,
     deleteSession: (sessionId: string) => ipcRenderer.invoke(recordingIpc.deleteSession, sessionId),
     retryUpload: (sessionId: string) => ipcRenderer.invoke(recordingIpc.retryUpload, sessionId),
+    getSession: (backendSessionId: string) =>
+      ipcRenderer.invoke(recordingIpc.getSession, backendSessionId) as Promise<BackendWorkflowSession>,
     openPermissionSettings: (permission: 'accessibility' | 'screen' | 'microphone') =>
       ipcRenderer.invoke(recordingIpc.openPermissionSettings, permission),
     onStateChanged: (listener: (state: RecordingState) => void) => {

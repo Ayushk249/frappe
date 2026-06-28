@@ -4,7 +4,11 @@ import type {
   LoginCredentials,
   SignUpCredentials
 } from '../../shared/connection'
-import type { BackendRecording, BackendRecordingStatusResponse } from '../../shared/recording'
+import type {
+  BackendRecording,
+  BackendRecordingStatusResponse,
+  BackendWorkflowSession
+} from '../../shared/recording'
 import { ConnectionSettingsStore } from './ConnectionSettingsStore'
 
 interface ApiAccount {
@@ -156,6 +160,11 @@ export class WorkTraceApiClient {
 
   async deleteRecording(recordingId: string): Promise<void> {
     await this.request(`/recordings/${recordingId}`, { method: 'DELETE' })
+  }
+
+  async getSession(sessionId: string): Promise<BackendWorkflowSession> {
+    const response = await this.request(`/sessions/${sessionId}`)
+    return (await response.json()) as BackendWorkflowSession
   }
 
   async request(path: string, init: RequestInit = {}): Promise<Response> {

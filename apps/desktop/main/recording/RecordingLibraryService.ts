@@ -1,6 +1,10 @@
 import { readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { RecordedSessionSummary, RecordingSessionManifest } from '../../shared/recording'
+import type {
+  BackendWorkflowSession,
+  RecordedSessionSummary,
+  RecordingSessionManifest
+} from '../../shared/recording'
 import { WorkTraceApiClient } from '../api/WorkTraceApiClient'
 import { RecordingUploader } from './RecordingUploader'
 
@@ -35,6 +39,10 @@ export class RecordingLibraryService {
     }
 
     await rm(sessionPath, { force: true, recursive: true })
+  }
+
+  async getSession(backendSessionId: string): Promise<BackendWorkflowSession> {
+    return this.apiClient.getSession(backendSessionId)
   }
 
   async retryUpload(sessionId: string): Promise<void> {
