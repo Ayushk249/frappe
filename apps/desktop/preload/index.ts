@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import {
   connectionIpc,
+  type BackendHealth,
   type ConnectionStatus,
   type LoginCredentials,
   type SignUpCredentials
@@ -35,6 +36,7 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke(connectionIpc.signup, credentials),
     logout: () => ipcRenderer.invoke(connectionIpc.logout),
     test: () => ipcRenderer.invoke(connectionIpc.test),
+    getHealth: () => ipcRenderer.invoke(connectionIpc.getHealth) as Promise<BackendHealth>,
     onStatusChanged: (listener: (status: ConnectionStatus) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, status: ConnectionStatus) =>
         listener(status)

@@ -1,5 +1,6 @@
 import type {
   Account,
+  BackendHealth,
   ConnectionStatus,
   LoginCredentials,
   SignUpCredentials
@@ -97,6 +98,15 @@ export class WorkTraceApiClient {
     } catch (error) {
       return this.settings.setError(error)
     }
+  }
+
+  async getHealth(): Promise<BackendHealth> {
+    // No auth required (/health is public) and works pre-login, so resolve the
+    // URL from the stored status rather than requiring a session token.
+    const apiUrl = this.settings.normalizeApiUrl(this.settings.getStatus().apiUrl)
+    const response = await fetch(`${apiUrl}/health`, { signal: AbortSignal.timeout(3_000) })
+    await requireSuccess(response)
+    return (await response.json()) as BackendHealth
   }
 
   async createRecording(payload: {
