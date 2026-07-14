@@ -11,6 +11,7 @@ import {
   experimentalSettingsPath
 } from './settings/ExperimentalSettingsStore'
 import { registerSettingsIpc } from './settings/registerSettingsIpc'
+import { createAccessibilityInspector } from './accessibility'
 import { RecordingManager } from './recording/RecordingManager'
 import { RecordingControlsWindow } from './recording/RecordingControlsWindow'
 import { InputEventService } from './recording/InputEventService'
@@ -74,11 +75,16 @@ app.whenReady().then(async () => {
   await experimentalSettings.initialize()
   registerSettingsIpc(experimentalSettings)
 
+  const accessibilityBundle = {
+    enabled: () => experimentalSettings.getFlags().accessibilityCapture,
+    inspector: createAccessibilityInspector()
+  }
+
   const recordingsPath = join(app.getPath('userData'), 'recordings')
   const sessionWriter = new SessionWriter(recordingsPath)
   const screenCapture = new ScreenCaptureService(sessionWriter)
   recordingControlsWindow = new RecordingControlsWindow(process.env['ELECTRON_RENDERER_URL'])
-  const inputEvents = new InputEventService(sessionWriter)
+  const inputEvents = new InputEventService(sessionWriter, accessibilityBundle)
   audioCapture = new AudioCaptureService(sessionWriter, process.env['ELECTRON_RENDERER_URL'])
   const recordingUploader = new RecordingUploader(apiClient)
   recordingManager = new RecordingManager(
