@@ -3,6 +3,22 @@ from celery import Celery
 from worktrace_api.settings import get_settings
 
 
+def broker_available(url: str, timeout: float = 1.0) -> bool:
+    """Quick, non-blocking reachability check for the Celery broker/result backend
+    (Redis). Used to gate the async dispatch so `/complete` never blocks on
+    broker reconnect retries when Redis/worker are not running. A connection
+    refusal returns immediately; only a silent host would wait `timeout`."""
+    try:
+        import redis as redis_lib
+
+        client = redis_lib.from_url(
+            url, socket_connect_timeout=timeout, socket_timeout=timeout
+        )
+        return bool(client.ping())
+    except Exception:
+        return False
+
+
 def create_celery_app() -> Celery:
     settings = get_settings()
     app = Celery(

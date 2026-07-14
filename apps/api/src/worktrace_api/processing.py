@@ -1,4 +1,5 @@
 import json
+import logging
 import struct
 from datetime import UTC, datetime
 from typing import Any
@@ -18,6 +19,8 @@ from worktrace_api.schemas import (
     WorkflowSession,
 )
 from worktrace_api.services import generate_sop
+
+logger = logging.getLogger(__name__)
 
 
 class RecordingProcessor:
@@ -89,9 +92,33 @@ class RecordingProcessor:
                 recording_id, session.id, RecordingStatus.READY_FOR_REVIEW
             )
 
-            # Trigger the Celery orchestration pipeline AFTER the session is linked
+            # Trigger the Celery orchestration pipeline AFTER the session is
+            # linked. Best-effort: if the broker is offline (Redis/worker not
+            # started), the session + SOP are already durable at ready_for_review,
+            # so we skip transcription/annotation rather than fail the recording.
+            # This keeps `/complete` from blocking on broker reconnect retries.
+            from worktrace_api.core.celery_app import broker_available
+            from worktrace_api.settings import get_settings
             from worktrace_api.tasks.pipeline import process_recording
-            process_recording.delay(str(recording_id), str(session.id), str(repo.tenant_id))
+
+            if broker_available(get_settings().redis_url):
+                try:
+                    process_recording.delay(
+                        str(recording_id), str(session.id), str(repo.tenant_id)
+                    )
+                except Exception:
+                    logger.warning(
+                        "async processing pipeline dispatch failed for recording %s",
+                        recording_id,
+                        exc_info=True,
+                    )
+            else:
+                logger.info(
+                    "broker offline; skipping async pipeline for recording %s "
+                    "(session %s left ready_for_review)",
+                    recording_id,
+                    session.id,
+                )
 
             return recording_result
         except Exception as exc:
