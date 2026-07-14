@@ -125,7 +125,7 @@ class EvidenceAnnotation(StrictModel):
     coordinate_space: Literal["screenshot_pixels", "global_screen"]
     bounds: TargetBounds
     confidence: float = Field(ge=0, le=1)
-    source: Literal["event_pointer", "fallback_coordinate"] = "event_pointer"
+    source: Literal["event_pointer", "fallback_coordinate", "accessibility"] = "event_pointer"
 
 
 class ScreenshotAnnotation(StrictModel):

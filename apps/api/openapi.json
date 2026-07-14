@@ -1936,7 +1936,8 @@
             "type": "string",
             "enum": [
               "event_pointer",
-              "fallback_coordinate"
+              "fallback_coordinate",
+              "accessibility"
             ],
             "title": "Source",
             "default": "event_pointer"
