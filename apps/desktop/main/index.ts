@@ -6,6 +6,11 @@ import {
 } from './api/ConnectionSettingsStore'
 import { WorkTraceApiClient } from './api/WorkTraceApiClient'
 import { registerConnectionIpc } from './api/registerConnectionIpc'
+import {
+  ExperimentalSettingsStore,
+  experimentalSettingsPath
+} from './settings/ExperimentalSettingsStore'
+import { registerSettingsIpc } from './settings/registerSettingsIpc'
 import { RecordingManager } from './recording/RecordingManager'
 import { RecordingControlsWindow } from './recording/RecordingControlsWindow'
 import { InputEventService } from './recording/InputEventService'
@@ -62,6 +67,12 @@ app.whenReady().then(async () => {
   const apiClient = new WorkTraceApiClient(connectionSettings)
   registerConnectionIpc(connectionSettings, apiClient)
   await apiClient.testConnection()
+
+  const experimentalSettings = new ExperimentalSettingsStore(
+    experimentalSettingsPath(app.getPath('userData'))
+  )
+  await experimentalSettings.initialize()
+  registerSettingsIpc(experimentalSettings)
 
   const recordingsPath = join(app.getPath('userData'), 'recordings')
   const sessionWriter = new SessionWriter(recordingsPath)

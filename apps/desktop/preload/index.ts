@@ -14,6 +14,11 @@ import {
   type RecordingState,
   type BackendWorkflowSession
 } from '../shared/recording'
+import {
+  settingsIpc,
+  type ExperimentalFlag,
+  type ExperimentalFlags
+} from '../shared/settings'
 
 // Expose a safe, minimal API to the renderer via contextBridge.
 // The renderer can call window.api.getAppVersion() but cannot access
@@ -35,6 +40,17 @@ contextBridge.exposeInMainWorld('api', {
         listener(status)
       ipcRenderer.on(connectionIpc.statusChanged, handler)
       return () => ipcRenderer.off(connectionIpc.statusChanged, handler)
+    }
+  },
+  settings: {
+    getFlags: () => ipcRenderer.invoke(settingsIpc.getFlags) as Promise<ExperimentalFlags>,
+    setFlag: (flag: ExperimentalFlag, value: boolean) =>
+      ipcRenderer.invoke(settingsIpc.setFlag, flag, value) as Promise<ExperimentalFlags>,
+    onFlagsChanged: (listener: (flags: ExperimentalFlags) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, flags: ExperimentalFlags) =>
+        listener(flags)
+      ipcRenderer.on(settingsIpc.flagsChanged, handler)
+      return () => ipcRenderer.off(settingsIpc.flagsChanged, handler)
     }
   },
   recording: {
