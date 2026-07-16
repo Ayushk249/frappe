@@ -1,4 +1,5 @@
 import json
+import logging
 import struct
 from datetime import UTC, datetime
 from typing import Any
@@ -18,6 +19,8 @@ from worktrace_api.schemas import (
     WorkflowSession,
 )
 from worktrace_api.services import generate_sop
+
+logger = logging.getLogger(__name__)
 
 
 class RecordingProcessor:
@@ -89,9 +92,33 @@ class RecordingProcessor:
                 recording_id, session.id, RecordingStatus.READY_FOR_REVIEW
             )
 
-            # Trigger the Celery orchestration pipeline AFTER the session is linked
+            # Trigger the Celery orchestration pipeline AFTER the session is
+            # linked. Best-effort: if the broker is offline (Redis/worker not
+            # started), the session + SOP are already durable at ready_for_review,
+            # so we skip transcription/annotation rather than fail the recording.
+            # This keeps `/complete` from blocking on broker reconnect retries.
+            from worktrace_api.core.celery_app import broker_available
+            from worktrace_api.settings import get_settings
             from worktrace_api.tasks.pipeline import process_recording
-            process_recording.delay(str(recording_id), str(session.id), str(repo.tenant_id))
+
+            if broker_available(get_settings().redis_url):
+                try:
+                    process_recording.delay(
+                        str(recording_id), str(session.id), str(repo.tenant_id)
+                    )
+                except Exception:
+                    logger.warning(
+                        "async processing pipeline dispatch failed for recording %s",
+                        recording_id,
+                        exc_info=True,
+                    )
+            else:
+                logger.info(
+                    "broker offline; skipping async pipeline for recording %s "
+                    "(session %s left ready_for_review)",
+                    recording_id,
+                    session.id,
+                )
 
             return recording_result
         except Exception as exc:
@@ -355,6 +382,22 @@ def _pointer_annotation(
 ) -> dict[str, Any] | None:
     if event_type not in {EventType.CLICK, EventType.SCROLL} or event_id is None:
         return None
+
+    # Phase 2: accessibility element bounds, already resolved to screenshot-pixel
+    # space by the client. Preferred over the coordinate box when present.
+    image_width_ax, image_height_ax = _metadata_image_size(screenshot_metadata)
+    element_bounds = _element_bounds(data.get("targetBounds"), image_width_ax, image_height_ax)
+    if element_bounds is not None:
+        return {
+            "type": "click_rectangle" if event_type == EventType.CLICK else "scroll_focus",
+            "event_id": str(event_id),
+            "screenshot_reference": str(screenshot_id) if screenshot_id else None,
+            "coordinate_space": "screenshot_pixels",
+            "bounds": element_bounds,
+            "confidence": 0.95,
+            "source": "accessibility",
+        }
+
     if x_value is None or y_value is None:
         return None
 
@@ -441,6 +484,56 @@ def _map_pointer_to_screenshot(
         "y": y * (image_height / display_height),
         "image_width": image_width,
         "image_height": image_height,
+    }
+
+
+def _metadata_image_size(
+    metadata: dict[str, Any] | None,
+) -> tuple[float | None, float | None]:
+    """Best-effort extraction of the screenshot pixel dimensions from chunk
+    metadata (capture.imageSize), used to clamp accessibility element bounds."""
+    if not isinstance(metadata, dict):
+        return None, None
+    capture = metadata.get("capture")
+    image_size = capture.get("imageSize") if isinstance(capture, dict) else None
+    if not isinstance(image_size, dict):
+        return None, None
+    try:
+        return float(image_size["width"]), float(image_size["height"])
+    except (KeyError, TypeError, ValueError):
+        return None, None
+
+
+def _element_bounds(
+    raw: Any, image_width: float | None, image_height: float | None
+) -> dict[str, float] | None:
+    """Validate + clamp an accessibility element rect (already in screenshot
+    pixels). Returns None for missing/invalid input so the caller falls back to
+    the coordinate-based box."""
+    if not isinstance(raw, dict):
+        return None
+    try:
+        x = float(raw["x"])
+        y = float(raw["y"])
+        width = float(raw["width"])
+        height = float(raw["height"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if width <= 0 or height <= 0:
+        return None
+    if image_width is not None and x >= image_width:
+        return None
+    if image_height is not None and y >= image_height:
+        return None
+    if image_width is not None:
+        x = max(0.0, min(x, max(0.0, image_width - 1)))
+    if image_height is not None:
+        y = max(0.0, min(y, max(0.0, image_height - 1)))
+    return {
+        "x": round(x, 2),
+        "y": round(y, 2),
+        "width": round(width, 2),
+        "height": round(height, 2),
     }
 
 

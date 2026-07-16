@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useConnection } from '../features/connection/useConnection'
+import { useServices } from '../features/connection/useServices'
 
 type IconName = 'dashboard' | 'sessions' | 'library' | 'analytics' | 'settings'
 
@@ -78,6 +79,7 @@ export function AppShell() {
   const location = useLocation()
   const pageTitle = routeTitles[location.pathname] ?? 'WorkTrace'
   const { status: connection } = useConnection()
+  const health = useServices(connection.state === 'connected')
   const connectionLabel =
     connection.state === 'connected'
       ? 'SYSTEM SYNCED'
@@ -183,6 +185,22 @@ export function AppShell() {
             </button>
           </div>
         </header>
+
+        {connection.state === 'connected' &&
+          health &&
+          (health.services.redis === 'down' || health.services.worker === 'down') && (
+            <div className="flex items-start gap-3 border-b border-amber-500/25 bg-amber-500/10 px-5 py-2.5 text-xs text-amber-200 md:px-8">
+              <span className="mt-1.5 size-1.5 shrink-0 animate-pulse rounded-full bg-amber-400" />
+              <p>
+                Background services offline (Redis {health.services.redis}
+                {health.services.worker !== 'up'
+                  ? `, worker ${health.services.worker}`
+                  : ''}
+                ). Recordings still save, but transcription &amp; annotation won&apos;t run until
+                Redis and the Celery worker are started.
+              </p>
+            </div>
+          )}
 
         <main>
           <Outlet />
