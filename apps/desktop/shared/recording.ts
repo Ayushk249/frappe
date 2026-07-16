@@ -84,6 +84,16 @@ export interface RecordingOptions {
   thumbnailWidth: number
   thumbnailHeight: number
   changeThreshold: number
+  /** 4-C: EMA background-model learning rate (weight of the new frame, 0..1). */
+  emaAlpha: number
+  /** 4-D: multiplier applied to the change threshold during input-idle periods. */
+  idleThresholdMultiplier: number
+  /** 4-D: window after an input event during which the base (lower) threshold is used. */
+  inputSensitivityWindowMs: number
+  /** 4-A: idle baseline window used to auto-calibrate the threshold. */
+  calibrationDurationMs: number
+  /** 5-B: minimum interval between captures during sustained input-driven motion. */
+  navigationSampleIntervalMs: number
 }
 
 export const defaultRecordingOptions: RecordingOptions = {
@@ -95,7 +105,12 @@ export const defaultRecordingOptions: RecordingOptions = {
   maxSettleDurationMs: 2500,
   thumbnailWidth: 160,
   thumbnailHeight: 90,
-  changeThreshold: 0.018
+  changeThreshold: 0.018,
+  emaAlpha: 0.2,
+  idleThresholdMultiplier: 3,
+  inputSensitivityWindowMs: 1500,
+  calibrationDurationMs: 3000,
+  navigationSampleIntervalMs: 1000
 }
 
 export interface RecordingState {
@@ -153,6 +168,28 @@ export interface BackendWorkflowSession {
   duration_ms: number
   status: string
   transcript: BackendTranscript | null
+}
+
+export interface BackendAnnotation {
+  event_id: string
+  event_type: string
+  type: 'click_rectangle' | 'scroll_focus' | 'pointer_focus'
+  coordinate_space: 'screenshot_pixels' | 'global_screen'
+  bounds: { x: number; y: number; width: number; height: number }
+  confidence: number
+  source: 'event_pointer' | 'fallback_coordinate' | 'accessibility'
+  label: string | null
+  role: string | null
+}
+
+export interface BackendScreenshotEvidence {
+  id: string
+  sequence: number
+  captured_at: string
+  width: number
+  height: number
+  media_type: string
+  annotations: BackendAnnotation[]
 }
 
 export interface RecordedSessionSummary {
@@ -242,6 +279,8 @@ export interface RecordingApi {
   deleteSession: (sessionId: string) => Promise<void>
   retryUpload: (sessionId: string) => Promise<void>
   getSession: (backendSessionId: string) => Promise<BackendWorkflowSession>
+  getSessionScreenshots: (backendSessionId: string) => Promise<BackendScreenshotEvidence[]>
+  getScreenshotImage: (backendSessionId: string, screenshotId: string) => Promise<ArrayBuffer>
   openPermissionSettings: (permission: 'accessibility' | 'screen' | 'microphone') => Promise<void>
   onStateChanged: (listener: (state: RecordingState) => void) => () => void
 }
@@ -258,6 +297,8 @@ export const recordingIpc = {
   deleteSession: 'recording:delete-session',
   retryUpload: 'recording:retry-upload',
   getSession: 'recording:get-session',
+  getSessionScreenshots: 'recording:get-session-screenshots',
+  getScreenshotImage: 'recording:get-screenshot-image',
   openPermissionSettings: 'recording:open-permission-settings',
   stateChanged: 'recording:state-changed',
   frameSample: 'recording:frame-sample',

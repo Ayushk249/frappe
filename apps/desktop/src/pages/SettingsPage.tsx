@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useConnection } from '../features/connection/useConnection'
+import type { ExperimentalFlags } from '../../shared/settings'
 
 function cleanError(error: unknown): string {
   const message = error instanceof Error ? error.message : 'Account action failed.'
@@ -86,8 +87,63 @@ export function SettingsPage() {
             receives only your account and connection status, never the token.
           </p>
         </div>
+
+        <ExperimentalSection />
       </div>
     </section>
+  )
+}
+
+function ExperimentalSection() {
+  const [flags, setFlags] = useState<ExperimentalFlags | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    const load = async () => {
+      try {
+        const current = await window.api.settings.getFlags()
+        if (active) setFlags(current)
+      } catch {
+        // Settings are best-effort; the rest of the page still renders.
+      }
+    }
+    void load()
+    const off = window.api.settings.onFlagsChanged((next) => setFlags(next))
+    return () => {
+      active = false
+      off()
+    }
+  }, [])
+
+  const toggle = async (value: boolean) => {
+    setBusy(true)
+    try {
+      await window.api.settings.setFlag('accessibilityCapture', value)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.025] p-5">
+      <p className="text-xs font-bold">Experimental</p>
+      <p className="mt-2 text-xs leading-5 text-white/45">
+        Accessibility-aware capture (experimental): when enabled, clicks also read the focused UI
+        element via the platform accessibility API for element-level highlight precision. Requires
+        Accessibility permission and affects the next recording.
+      </p>
+      <label className="mt-4 flex items-center gap-3 text-sm">
+        <input
+          type="checkbox"
+          className="size-4 accent-emerald-400"
+          disabled={busy || flags === null}
+          checked={flags?.accessibilityCapture ?? false}
+          onChange={(event) => void toggle(event.target.checked)}
+        />
+        <span className="text-white/80">Enable accessibility capture</span>
+      </label>
+    </div>
   )
 }
 

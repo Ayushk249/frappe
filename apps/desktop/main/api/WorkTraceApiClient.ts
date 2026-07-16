@@ -1,5 +1,6 @@
 import type {
   Account,
+  BackendHealth,
   ConnectionStatus,
   LoginCredentials,
   SignUpCredentials
@@ -7,6 +8,7 @@ import type {
 import type {
   BackendRecording,
   BackendRecordingStatusResponse,
+  BackendScreenshotEvidence,
   BackendWorkflowSession
 } from '../../shared/recording'
 import { ConnectionSettingsStore } from './ConnectionSettingsStore'
@@ -98,6 +100,15 @@ export class WorkTraceApiClient {
     }
   }
 
+  async getHealth(): Promise<BackendHealth> {
+    // No auth required (/health is public) and works pre-login, so resolve the
+    // URL from the stored status rather than requiring a session token.
+    const apiUrl = this.settings.normalizeApiUrl(this.settings.getStatus().apiUrl)
+    const response = await fetch(`${apiUrl}/health`, { signal: AbortSignal.timeout(3_000) })
+    await requireSuccess(response)
+    return (await response.json()) as BackendHealth
+  }
+
   async createRecording(payload: {
     workflowName: string
     hasAudio: boolean
@@ -165,6 +176,16 @@ export class WorkTraceApiClient {
   async getSession(sessionId: string): Promise<BackendWorkflowSession> {
     const response = await this.request(`/sessions/${sessionId}`)
     return (await response.json()) as BackendWorkflowSession
+  }
+
+  async getSessionScreenshots(sessionId: string): Promise<BackendScreenshotEvidence[]> {
+    const response = await this.request(`/sessions/${sessionId}/screenshots`)
+    return (await response.json()) as BackendScreenshotEvidence[]
+  }
+
+  async getScreenshotImage(sessionId: string, screenshotId: string): Promise<ArrayBuffer> {
+    const response = await this.request(`/sessions/${sessionId}/screenshots/${screenshotId}`)
+    return response.arrayBuffer()
   }
 
   async request(path: string, init: RequestInit = {}): Promise<Response> {

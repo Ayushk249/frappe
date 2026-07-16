@@ -501,3 +501,136 @@ def test_delete_recording_removes_metadata_and_raw_chunks(client):
     assert missing.status_code == 404
     repeated = client.delete(f"/recordings/{recording['id']}", headers=auth_headers())
     assert repeated.status_code == 404
+
+
+def test_complete_recording_succeeds_without_broker(client):
+    """With no Redis/worker running, /complete must still build the session + SOP
+    synchronously (best-effort async dispatch) and return ready_for_review, and
+    the click's evidence annotation must be resolved to screenshot-pixel space."""
+    recording = create_recording(client, has_audio=False)
+    before_screenshot_id = str(uuid4())
+    after_screenshot_id = str(uuid4())
+    event_id = str(uuid4())
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8 + b"\x00\x00\x05\x00\x00\x00\x02\xd0"  # 1280x720
+
+    event_payload = json.dumps(
+        {
+            "id": event_id,
+            "sequence": 1,
+            "timestamp": "2026-06-19T10:00:00Z",
+            "type": "click",
+            "data": {
+                "x": 480,
+                "y": 320,
+                "button": "left",
+                "application": "ERP Desktop",
+                "targetLabel": "Approve",
+                "pointer": {
+                    "coordinateSpace": "global-screen",
+                    "x": 480,
+                    "y": 320,
+                    "displayId": "1",
+                    "displayScaleFactor": 1,
+                    "pointOnDisplay": {"x": 480, "y": 320},
+                },
+            },
+            "beforeScreenshotId": before_screenshot_id,
+        }
+    ).encode()
+
+    assert (
+        upload_chunk(
+            client,
+            recording["id"],
+            0,
+            png,
+            content_type="screenshots",
+            metadata={
+                "id": before_screenshot_id,
+                "sequence": 1,
+                "capturedAt": "2026-06-19T09:59:59Z",
+                "changeScore": 0,
+            },
+            media_type="image/png",
+        ).status_code
+        == 200
+    )
+    assert (
+        upload_chunk(
+            client,
+            recording["id"],
+            1,
+            event_payload,
+            content_type="events",
+            media_type="application/x-ndjson",
+        ).status_code
+        == 200
+    )
+    assert (
+        upload_chunk(
+            client,
+            recording["id"],
+            2,
+            png,
+            content_type="screenshots",
+            metadata={
+                "id": after_screenshot_id,
+                "sequence": 2,
+                "capturedAt": "2026-06-19T10:00:01Z",
+                "eventIds": [event_id],
+                "changeScore": 0.24,
+                "capture": {
+                    "imageSize": {"width": 1280, "height": 720},
+                    "display": {
+                        "id": "1",
+                        "scaleFactor": 1,
+                        "bounds": {"x": 0, "y": 0, "width": 1280, "height": 720},
+                    },
+                },
+            },
+            media_type="image/png",
+        ).status_code
+        == 200
+    )
+
+    completed = client.post(
+        f"/recordings/{recording['id']}/complete",
+        headers=auth_headers(),
+        json={"expected_chunk_count": 3},
+    )
+    assert completed.status_code == 200
+    assert completed.json()["status"] == "ready_for_review"
+    session_id = completed.json()["session_id"]
+
+    session = client.get(f"/sessions/{session_id}", headers=auth_headers())
+    assert session.status_code == 200
+    event = session.json()["events"][0]
+    assert event["event_type"] == "click"
+    assert event["target_label"] == "Approve"
+    annotation = event["event_data"]["evidenceAnnotation"]
+    assert annotation["coordinate_space"] == "screenshot_pixels"
+    assert annotation["bounds"] == {"x": 432.0, "y": 284.0, "width": 96.0, "height": 72.0}
+
+
+def test_broker_available_returns_false_for_unreachable_host():
+    from worktrace_api.core.celery_app import broker_available
+
+    assert broker_available("redis://127.0.0.1:1/0", timeout=0.5) is False
+
+
+def test_service_status_reports_redis_down_without_broker():
+    from worktrace_api.core.celery_app import service_status
+
+    assert service_status("redis://127.0.0.1:1/0", timeout=0.5) == {
+        "redis": "down",
+        "worker": "down",
+    }
+
+
+def test_health_reports_services(client):
+    response = client.get("/health")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["services"]["redis"] in {"up", "down"}
+    assert body["services"]["worker"] in {"up", "down", "unknown"}

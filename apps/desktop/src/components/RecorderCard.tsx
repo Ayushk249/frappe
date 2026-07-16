@@ -139,7 +139,7 @@ export function RecorderCard() {
             ? 'Name This Workflow'
             : isRecording || isPaused
               ? 'Recording Your Workflow'
-              : 'Initiate Neural Trace'}
+              : 'Capture a Workflow'}
         </h2>
 
         <p className="mt-8 max-w-xl text-base leading-7 text-white/65">
