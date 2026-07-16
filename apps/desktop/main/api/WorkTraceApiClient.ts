@@ -9,6 +9,7 @@ import type {
   BackendRecording,
   BackendRecordingStatusResponse,
   BackendScreenshotEvidence,
+  BackendSOP,
   BackendWorkflowSession
 } from '../../shared/recording'
 import { ConnectionSettingsStore } from './ConnectionSettingsStore'
@@ -184,6 +185,20 @@ export class WorkTraceApiClient {
   }
 
   async getScreenshotImage(sessionId: string, screenshotId: string): Promise<ArrayBuffer> {
+    const response = await this.request(`/sessions/${sessionId}/screenshots/${screenshotId}`)
+    return response.arrayBuffer()
+  }
+
+  async getSessionSops(sessionId: string): Promise<BackendSOP[]> {
+    // Uses the export bundle endpoint which returns all SOPs for a session.
+    const response = await this.request(`/exports/${sessionId}`)
+    const bundle = (await response.json()) as { sops: BackendSOP[] }
+    return bundle.sops
+  }
+
+  async getSopScreenshotImage(sessionId: string, screenshotId: string): Promise<ArrayBuffer> {
+    // Reuses the same screenshot image endpoint — the annotated image is served
+    // by screenshot ID regardless of whether it was fetched for evidence or SOP.
     const response = await this.request(`/sessions/${sessionId}/screenshots/${screenshotId}`)
     return response.arrayBuffer()
   }
