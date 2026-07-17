@@ -6,10 +6,14 @@
 #   - worker -> command overridden to `celery worker ...`
 FROM python:3.12-slim
 
+# uv: drop-in fast replacement for pip (Astral). Pinned image tag for
+# reproducible builds; bump deliberately. Binaries copied, not installed,
+# so uv is not added to the Python environment.
+COPY --from=ghcr.io/astral-sh/uv:0.5.11 /uv /uvx /usr/local/bin/
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    UV_LINK_MODE=copy \
     # Lets `celery -A worktrace_api.core.celery_app ...` resolve tasks
     # the same way `PYTHONPATH=src` does in the README.
     PYTHONPATH=/app/src
@@ -22,7 +26,10 @@ COPY pyproject.toml ./
 COPY src ./src
 COPY alembic.ini ./
 COPY migrations ./migrations
-RUN pip install -e .
+# --system installs into system site-packages (no venv). Cache mount lets
+# the resolved-wheel cache survive across `docker compose build` runs.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system -e .
 
 EXPOSE 8000
 
