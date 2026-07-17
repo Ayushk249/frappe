@@ -11,6 +11,7 @@ import {
   type AnnotationInput,
   type AudioRecorderApi,
   type BackendScreenshotEvidence,
+  type BackendSOP,
   type RecordingOptions,
   type RecordedSessionSummary,
   type RecordingState,

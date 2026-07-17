@@ -560,9 +560,10 @@ def replace_screenshot_annotations(
 def get_session_screenshot_image(
     session_id: UUID,
     screenshot_id: UUID,
+    type: str | None = None,
     repo: Repository = Depends(repository),
 ) -> Response:
-    """Serve the raw screenshot bytes for overlay rendering."""
+    """Serve the raw screenshot bytes for overlay rendering or annotated bytes for SOP."""
     require_session(repo, session_id)
     screenshot = next(
         (
@@ -578,12 +579,13 @@ def get_session_screenshot_image(
         root=settings.recording_storage_path,
         max_chunk_bytes=settings.max_chunk_bytes,
     )
-    if not storage.exists(screenshot.storage_key):
+    key_to_serve = screenshot.annotated_storage_key if type == "annotated" and screenshot.annotated_storage_key else screenshot.storage_key
+    if not key_to_serve or not storage.exists(key_to_serve):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Screenshot image not available"
         )
     return Response(
-        content=storage.read(screenshot.storage_key), media_type=screenshot.media_type
+        content=storage.read(key_to_serve), media_type=screenshot.media_type
     )
 
 

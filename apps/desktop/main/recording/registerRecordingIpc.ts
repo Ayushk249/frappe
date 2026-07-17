@@ -47,6 +47,14 @@ export function registerRecordingIpc(
     (_event, backendSessionId: string, screenshotId: string) =>
       library.getScreenshotImage(backendSessionId, screenshotId)
   )
+  ipcMain.handle(recordingIpc.getSessionSops, (_event, backendSessionId: string) =>
+    library.getSessionSops(backendSessionId)
+  )
+  ipcMain.handle(
+    recordingIpc.getSopScreenshotImage,
+    (_event, backendSessionId: string, screenshotId: string) =>
+      library.getSopScreenshotImage(backendSessionId, screenshotId)
+  )
   ipcMain.handle(
     recordingIpc.saveScreenshotAnnotations,
     (
