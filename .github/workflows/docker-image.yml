@@ -38,7 +38,7 @@ jobs:
       - name: Scan API image for CVEs (Trivy)
         # Report-only: exit-code 0 so a finding never breaks the build at this stage.
         # The image was built in the previous step and is available in the local daemon.
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: worktrace-api:ci
           severity: HIGH,CRITICAL
