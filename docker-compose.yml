@@ -87,6 +87,8 @@ services:
   api:
     build:
       context: ./apps/api
+      args:
+        DEBUG: "true"
     image: worktrace-api:dev
     depends_on:
       redis:

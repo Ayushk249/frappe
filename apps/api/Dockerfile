@@ -40,12 +40,13 @@ COPY docker-entrypoint.sh ./
 # the resolved-wheel cache survive across `docker compose build` runs.
 # Install the CPU build first. It satisfies pyproject.toml when the rest of
 # the package is resolved, avoiding generic Linux Torch's CUDA dependencies.
+ARG DEBUG=false
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system \
       --index-url https://download.pytorch.org/whl/cpu \
       "torch==2.10.0+cpu" && \
     uv pip install --system -e . && \
-    uv pip install --system "debugpy>=1.8,<2" && \
+    if [ "$DEBUG" = "true" ]; then uv pip install --system "debugpy>=1.8,<2"; fi && \
     chmod +x ./docker-entrypoint.sh
 
 EXPOSE 8000
