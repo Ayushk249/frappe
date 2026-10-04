@@ -17,6 +17,7 @@ x-db-env: &db-env
 # Shared env so the api and worker services can never disagree on broker/db.
 x-api-env: &api-env
   WORKTRACE_ENV: development
+  UVICORN_RELOAD: 1
   # Redis is the celery broker AND result backend (core/celery_app.py).
   WORKTRACE_REDIS_URL: redis://redis:6379/0
   # psycopg3 driver (psycopg[binary] in apps/api/pyproject.toml). The host
