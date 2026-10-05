@@ -42,6 +42,7 @@ COPY docker-entrypoint.sh ./
 # the package is resolved, avoiding generic Linux Torch's CUDA dependencies.
 ARG DEBUG=false
 RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system -U setuptools wheel && \
     uv pip install --system \
       --index-url https://download.pytorch.org/whl/cpu \
       "torch==2.10.0+cpu" && \
