@@ -2542,7 +2542,7 @@ requires-dist = [
     { name = "onnxruntime", specifier = ">=1.19,<2" },
     { name = "openai", specifier = ">=1.10,<2" },
     { name = "pgvector", specifier = ">=0.3,<1" },
-    { name = "pillow", specifier = ">=10.0,<12" },
+    { name = "pillow", specifier = ">=10.0,<13" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
     { name = "pydantic-settings", specifier = ">=2.7,<3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3,<9" },
