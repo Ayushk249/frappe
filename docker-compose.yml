@@ -162,7 +162,9 @@ services:
       # audio/vision/llm/default tasks will sit unconsumed.
       - -Q
       - default,audio,vision,llm,celery
-
+    # The worker has no HTTP endpoint; disable the inherited HEALTHCHECK.
+    healthcheck:
+      disable: true
 volumes:
   redis-data:
   pg-data:
